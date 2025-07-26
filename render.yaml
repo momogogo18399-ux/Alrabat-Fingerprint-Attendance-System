@@ -1,0 +1,22 @@
+services:
+  # قاعدة بيانات PostgreSQL
+  - type: pserv
+    name: attendance-db
+    env: postgres
+    plan: free # استخدم الخطة المجانية
+
+  # تطبيق الويب Flask
+  - type: web
+    name: attendance-webapp
+    env: python
+    plan: free # استخدم الخطة المجانية
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn web_app:app"
+    envVars:
+      - key: DATABASE_URL
+        fromService:
+          type: pserv
+          name: attendance-db
+          property: connectionString
+      - key: PYTHON_VERSION
+        value: 3.10.11 # استخدم إصدار بايثون الذي تستخدمه

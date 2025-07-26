@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بوابة الموظف الذكية</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-color: #3b82f6; --success-color: #10b981; --error-color: #ef4444; --warning-color: #f59e0b;
+            --bg-color: #f0f4f8; --card-bg: rgba(255, 255, 255, 0.7); --text-dark: #1f2937; --text-light: #4b5563;
+            --border-color: rgba(209, 213, 219, 0.5); --shadow-color: rgba(0, 0, 0, 0.1);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Tajawal', sans-serif; background-color: var(--bg-color);
+            background-image: url('data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23d6dee1" fill-opacity="0.2"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');
+            color: var(--text-dark); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px;
+        }
+        .main-card {
+            width: 100%; max-width: 450px; background-color: var(--card-bg);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 20px; box-shadow: 0 10px 30px var(--shadow-color);
+            padding: 35px; text-align: center; transition: all 0.3s ease;
+        }
+        header h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+        #clock { font-size: 16px; color: var(--text-light); margin-bottom: 25px; }
+        .input-group { position: relative; margin-bottom: 15px; }
+        #identifier-input {
+            font-family: 'Tajawal', sans-serif; font-size: 18px; width: 100%; padding: 15px;
+            border: 1px solid #d1d5db; border-radius: 10px;
+            text-align: center; direction: ltr; transition: all 0.3s;
+        }
+        #identifier-input:focus { border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2); outline: none; }
+        
+        #dashboard { transition: all 0.5s ease; overflow: hidden; max-height: 0; opacity: 0; }
+        #dashboard.visible { max-height: 600px; opacity: 1; }
+        
+        .welcome-banner {
+            background-color: #eef2f3; border-radius: 10px; padding: 20px;
+            margin-top: 25px; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; min-height: 110px;
+        }
+        .spinner-inline {
+            width: 30px; height: 30px;
+            border: 4px solid var(--border-color);
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s ease-in-out infinite;
+        }
+        .spinner-inline.hidden { display: none; }
+        #status-content.hidden { display: none; }
+        
+        #welcome-message { font-size: 22px; font-weight: 700; }
+        #current-status { font-size: 18px; color: var(--text-light); font-weight: 500; margin-top: 5px; }
+        
+        #late-reason-group { margin-top: 20px; transition: all 0.5s ease; }
+        #late-reason-group.hidden { display: none; }
+        #late-reason { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); font-family: 'Tajawal', sans-serif; font-size: 16px; background-color: #fff; }
+        
+        .button-group { display: grid; grid-template-columns: 1fr; gap: 15px; margin-top: 25px; }
+        button { font-family: 'Tajawal', sans-serif; font-size: 18px; font-weight: bold; padding: 16px; border: none; border-radius: 10px; color: white; cursor: pointer; transition: all 0.2s ease-in-out; display: none; align-items: center; justify-content: center; gap: 10px; }
+        button.visible { display: flex; }
+        button:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .btn-check-in { background: linear-gradient(45deg, #10b981, #34d399); }
+        .btn-check-out { background: linear-gradient(45deg, #ef4444, #f87171); }
+        
+        #todays-log { margin-top: 30px; transition: all 0.5s ease; }
+        #todays-log.hidden { display: none; }
+        #todays-log h3 { font-size: 18px; margin-bottom: 15px; color: var(--text-light); border-top: 1px solid #e5e7eb; padding-top: 20px; }
+        #todays-log-list { list-style: none; padding: 0; }
+        #todays-log-list li {
+            display: flex; justify-content: space-between; align-items: center;
+            background-color: #f9fafb; padding: 12px 15px; border-radius: 8px;
+            margin-bottom: 8px; font-size: 16px;
+        }
+        #todays-log-list .log-time { font-weight: 700; direction: ltr; }
+        #todays-log-list .log-type { display: flex; align-items: center; gap: 8px; }
+        
+        #message { margin-top: 25px; padding: 15px; border-radius: 8px; font-weight: bold; text-align: center; opacity: 0; transform: translateY(10px); transition: opacity 0.4s ease, transform 0.4s ease; max-height: 0; overflow: hidden; }
+        #message.visible { opacity: 1; transform: translateY(0); max-height: 100px; }
+        .msg-success { background-color: #d1fae5; color: #065f46; }
+        .msg-error { background-color: #fee2e2; color: #991b1b; }
+        .msg-info { background-color: #dbeafe; color: #1e40af; }
+        
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div class="main-card">
+        <header>
+            <h1>بوابة الموظف الذكية</h1>
+            <p id="clock"></p>
+        </header>
+
+        <main>
+            <div class="input-group">
+                <input type="text" id="identifier-input" placeholder="الكود الوظيفي أو رقم الهاتف" autocomplete="off">
+            </div>
+
+            <div id="dashboard" class="">
+                <div class="welcome-banner">
+                    <div id="status-content">
+                        <h2 id="welcome-message"></h2>
+                        <p id="current-status"></p>
+                    </div>
+                    <div id="inline-loader" class="spinner-inline hidden"></div>
+                </div>
+                
+                <div id="late-reason-group" class="hidden">
+                    <select id="late-reason">
+                        <option value="">-- تحديد سبب التأخير (اختياري) --</option>
+                        <option value="إذن تأخير">إذن تأخير</option>
+                        <option value="مأمورية صباحية">مأمورية صباحية</option>
+                        <option value="ظرف طارئ">ظرف طارئ</option>
+                    </select>
+                </div>
+                
+                <div class="button-group">
+                    <button id="check-in-btn" class="btn-check-in">تسجيل حضور</button>
+                    <button id="check-out-btn" class="btn-check-out">تسجيل انصراف</button>
+                </div>
+            </div>
+
+            <div id="message"></div>
+            
+            <div id="todays-log" class="hidden">
+                <h3>سجل اليوم</h3>
+                <ul id="todays-log-list"></ul>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const identifierInput = document.getElementById('identifier-input');
+        const dashboard = document.getElementById('dashboard');
+        const checkInButton = document.getElementById('check-in-btn');
+        const checkOutButton = document.getElementById('check-out-btn');
+        const welcomeMessage = document.getElementById('welcome-message');
+        const currentStatus = document.getElementById('current-status');
+        const lateReasonGroup = document.getElementById('late-reason-group');
+        const lateReasonSelect = document.getElementById('late-reason');
+        const todaysLog = document.getElementById('todays-log');
+        const todaysLogList = document.getElementById('todays-log-list');
+        const messageDiv = document.getElementById('message');
+        const clockDiv = document.getElementById('clock');
+        const statusContent = document.getElementById('status-content');
+        const inlineLoader = document.getElementById('inline-loader');
+        let messageTimer;
+        const DEVICE_TOKEN_KEY = 'attendance_device_token';
+
+        updateClock();
+        getOrGenerateDeviceToken();
+        setInterval(updateClock, 1000);
+        identifierInput.addEventListener('input', fetchEmployeeStatus);
+        checkInButton.addEventListener('click', () => recordAttendance('Check-In'));
+        checkOutButton.addEventListener('click', () => recordAttendance('Check-Out'));
+
+        function updateClock() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('ar-EG', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit'});
+            const dateString = now.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'});
+            clockDiv.innerHTML = `${dateString} | ${timeString}`;
+        }
+
+        async function fetchEmployeeStatus() {
+            clearMessage();
+            const identifier = identifierInput.value.trim();
+            if (identifier.length < 4) {
+                dashboard.classList.remove('visible');
+                todaysLog.classList.add('hidden');
+                return;
+            }
+            try {
+                const response = await fetch(`/api/employee-status?identifier=${identifier}`);
+                if (!response.ok) throw new Error('Network response was not ok.');
+                const result = await response.json();
+                if (result.status === 'found') {
+                    updateDashboard(result);
+                } else {
+                    dashboard.classList.remove('visible');
+                    todaysLog.classList.add('hidden');
+                }
+            } catch (error) {
+                console.error("Error fetching status:", error);
+                showMessage('لا يمكن الاتصال بالخادم. حاول مرة أخرى.', 'error');
+                dashboard.classList.remove('visible');
+                todaysLog.classList.add('hidden');
+            }
+        }
+        
+        async function recordAttendance(type) {
+            showLoader(true);
+            const identifier = identifierInput.value.trim();
+            let success = false;
+            
+            try {
+                const notes = lateReasonSelect.value;
+                const deviceToken = getOrGenerateDeviceToken();
+                const location = await getLocation();
+                const fingerprint = getDeviceFingerprint();
+                const payload = { identifier, fingerprint, location, type, notes, token: deviceToken };
+
+                const response = await fetch('/api/check-in', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                showMessage(result.message, response.ok ? 'success' : 'error');
+                if (response.ok) { success = true; }
+            } catch (error) {
+                showMessage(error.message || 'حدث خطأ فني غير متوقع.', 'error');
+            } finally {
+                showLoader(false);
+                if (success) {
+                    await fetchEmployeeStatus();
+                }
+            }
+        }
+
+        function updateDashboard(data) {
+            dashboard.classList.add('visible');
+            welcomeMessage.textContent = `مرحباً، ${data.employee_name}`;
+            const lastCheckIn = data.todays_log.filter(log => log.type === 'Check-In').pop();
+            const lastCheckOut = data.todays_log.filter(log => log.type === 'Check-Out').pop();
+            
+            if (lastCheckIn && (!lastCheckOut || new Date(`1970-01-01T${lastCheckOut.check_time}`) < new Date(`1970-01-01T${lastCheckIn.check_time}`))) {
+                currentStatus.innerHTML = `✅ أنت بالداخل منذ الساعة <strong>${lastCheckIn.check_time}</strong>`;
+            } else {
+                currentStatus.innerHTML = `❌ أنت بالخارج حالياً`;
+            }
+            
+            checkInButton.classList.toggle('visible', data.next_action === 'Check-In');
+            checkOutButton.classList.toggle('visible', data.next_action === 'Check-Out');
+            lateReasonGroup.classList.toggle('hidden', !data.is_late || data.next_action !== 'Check-In');
+
+            if (data.todays_log && data.todays_log.length > 0) {
+                todaysLog.classList.remove('hidden');
+                todaysLogList.innerHTML = '';
+                data.todays_log.sort((a, b) => b.id - a.id).forEach(log => {
+                    const li = document.createElement('li');
+                    const icon = log.type === 'Check-In' ? '✅' : '❌';
+                    const typeText = log.type === 'Check-In' ? 'حضور' : 'انصراف';
+                    li.innerHTML = `
+                        <div class="log-type">${icon} ${typeText}</div>
+                        <div class="log-time">${log.check_time}</div>
+                    `;
+                    todaysLogList.appendChild(li);
+                });
+            } else {
+                todaysLog.classList.add('hidden');
+            }
+        }
+        
+        function showLoader(isLoading) {
+            statusContent.classList.toggle('hidden', isLoading);
+            inlineLoader.classList.toggle('hidden', !isLoading);
+        }
+        function showMessage(msg, type) { clearTimeout(messageTimer); messageDiv.textContent = msg; messageDiv.className = `msg-${type} visible`; messageTimer = setTimeout(clearMessage, 6000); }
+        function clearMessage() { messageDiv.classList.remove('visible'); }
+        function getLocation() { return new Promise((resolve, reject) => { if (!navigator.geolocation) { return reject(new Error("المتصفح لا يدعم تحديد المواقع.")); } navigator.geolocation.getCurrentPosition(position => resolve({ lat: position.coords.latitude, lon: position.coords.longitude }), () => reject(new Error("فشل تحديد الموقع. يرجى السماح بالوصول لموقعك.")), { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }); }); }
+        function generateUUID() { return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)); }
+        function getOrGenerateDeviceToken() { let token = localStorage.getItem(DEVICE_TOKEN_KEY); if (!token) { token = generateUUID(); localStorage.setItem(DEVICE_TOKEN_KEY, token); } return token; }
+        function getDeviceFingerprint() { const fingerprint = [ navigator.userAgent, navigator.language, screen.width, screen.height, new Date().getTimezoneOffset(), (navigator.hardwareConcurrency || 'unknown'), (navigator.platform || 'unknown') ].join('||'); return btoa(fingerprint); }
+    
+    });
+    </script>
+</body>
+</html>

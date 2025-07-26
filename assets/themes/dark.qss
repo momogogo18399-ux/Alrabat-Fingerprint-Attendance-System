@@ -1,0 +1,107 @@
+/* =================================================== */
+/* === Dark Theme Stylesheet for PyQt Application === */
+/* =================================================== */
+
+/* --- General Widget Styling (Base) --- */
+/* Sets the default background, text color, and font for all widgets. */
+QWidget {
+    background-color: #2b2b2b; /* Dark grey background */
+    color: #f0f0f0;            /* Light grey text */
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 10pt;
+}
+
+/* --- Main Window --- */
+/* Ensures the main window background is consistent. */
+QMainWindow {
+    background-color: #2b2b2b;
+}
+
+/* --- Tab Widgets --- */
+/* Styles the container for tab pages. */
+QTabWidget::pane {
+    border-top: 2px solid #4a4a4a;
+}
+/* Styles individual tabs. */
+QTabBar::tab {
+    background: #3c3c3c;
+    border: 1px solid #4a4a4a;
+    padding: 6px 12px;
+    border-bottom-color: #4a4a4a;
+}
+/* Styles tabs on hover or when selected for interactivity. */
+QTabBar::tab:selected, QTabBar::tab:hover {
+    background: #555555;
+}
+QTabBar::tab:selected {
+    border-color: #6a6a6a;
+    border-bottom-color: #555555; /* Makes the selected tab look connected to the pane. */
+}
+
+/* --- Tables and Views --- */
+/* Styles tables for data display. */
+QTableView, QTableWidget {
+    background-color: #3c3c3c;
+    border: 1px solid #4a4a4a;
+    gridline-color: #4a4a4a;
+    selection-background-color: #0078d7; /* A bright blue for selected items */
+    selection-color: #ffffff;            /* White text for selected items */
+}
+/* Styles table headers. */
+QHeaderView::section {
+    background-color: #555555;
+    border: 1px solid #4a4a4a;
+    padding: 5px;
+}
+
+/* --- Buttons --- */
+/* General button styling. */
+QPushButton {
+    background-color: #555555;
+    border: 1px solid #666666;
+    padding: 6px 12px;
+    border-radius: 4px;
+    min-width: 80px;
+}
+/* Button style on hover for feedback. */
+QPushButton:hover {
+    background-color: #6a6a6a;
+}
+/* Button style when pressed. */
+QPushButton:pressed {
+    background-color: #7a7a7a;
+}
+
+/* --- Input Fields --- */
+/* Unified styling for all text and data input fields. */
+QLineEdit, QTextEdit, QComboBox, QDateEdit, QSpinBox, QTimeEdit {
+    background-color: #3c3c3c;
+    border: 1px solid #666666;
+    padding: 4px;
+    border-radius: 4px;
+    color: #f0f0f0;
+}
+/* Highlights the input field when it has focus. */
+QLineEdit:focus, QTextEdit:focus, QComboBox:focus, QDateEdit:focus {
+    border: 1px solid #0078d7; /* Same blue as table selection */
+}
+
+/* --- Group Boxes --- */
+/* Styles containers used to group related settings. */
+QGroupBox {
+    border: 1px solid #666666;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+/* Styles the title of the group box. */
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top center;
+    padding: 0 3px;
+    color: #f0f0f0;
+}
+
+/* --- Basic Text and Checkboxes --- */
+QLabel, QCheckBox {
+    color: #f0f0f0;
+}
