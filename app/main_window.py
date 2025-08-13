@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem, QHeaderView, QPushButton, QApplication, QDateEdit, QHBoxLayout,
     QMessageBox, QFileDialog, QMenuBar, QStatusBar
 )
-from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtGui import QAction, QIcon, QPixmap
 from PyQt6.QtGui import QFont, QColor
 from PyQt6.QtCore import Qt, QDate, QTime, QCoreApplication, QTranslator, QLocale, QTimer
 
@@ -70,8 +70,13 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(window_title)
         self.setGeometry(100, 100, 1280, 720)
         try:
+            import os
             from app.utils.resources import resource_path
-            self.setWindowIcon(QIcon(resource_path('assets/icons/app.png')))
+            rabat_logo = resource_path('assets/icons/rabat-logo.jpg')
+            if os.path.exists(rabat_logo):
+                self.setWindowIcon(QIcon(rabat_logo))
+            else:
+                self.setWindowIcon(QIcon(resource_path('assets/icons/app.png')))
         except Exception:
             pass
         
@@ -307,7 +312,38 @@ class MainWindow(QMainWindow):
 
     def _show_about(self):
         current_version = get_current_version()
-        QMessageBox.information(self, self.tr("About"), self.tr("Employee Attendance System") + f"\n{self.tr('Version')}: {current_version}\n\n" + self.tr("Developed with Python, PyQt6, and Flask."))
+        message = (
+            "Employee Attendance System\n"
+            f"Version: {current_version}\n\n"
+            "Designed and developed by: Eng. Mohamed Hagag (Planning Engineer)\n"
+            "For: Rabat Foundation\n\n"
+            "Overview:\n"
+            "- Modern, flexible Attendance and HR admin dashboard.\n"
+            "- Detailed reports with Excel export and multi-language ready.\n"
+            "- Built-in auto-update checks to keep you up-to-date.\n\n"
+            "This system is built with Python, PyQt6, and Flask to simplify HR operations and improve daily tracking efficiency."
+        )
+        box = QMessageBox(self)
+        box.setWindowTitle(self.tr("About"))
+        box.setText(message)
+        try:
+            from app.utils.resources import resource_path
+            import os
+            logo_path = resource_path('assets/icons/rabat-logo.jpg')
+            if os.path.exists(logo_path):
+                pix = QPixmap(logo_path)
+                if not pix.isNull():
+                    box.setIconPixmap(pix.scaledToWidth(96, Qt.TransformationMode.SmoothTransformation))
+            else:
+                # fallback to app icon if exists
+                app_icon_path = resource_path('assets/icons/app.png')
+                if os.path.exists(app_icon_path):
+                    pix = QPixmap(app_icon_path)
+                    if not pix.isNull():
+                        box.setIconPixmap(pix.scaledToWidth(96, Qt.TransformationMode.SmoothTransformation))
+        except Exception:
+            pass
+        box.exec()
 
     def closeEvent(self, event):
         # ضمان إيقاف الخيوط الخلفية قبل الغلق

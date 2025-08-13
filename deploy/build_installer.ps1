@@ -29,7 +29,7 @@ Invoke-Step "Install project requirements" { & $Py -m pip install --no-cache-dir
 Invoke-Step "Install PyInstaller" { & $Py -m pip install --no-cache-dir "pyinstaller>=6.6" }
 
 # 3) Build exe
-$IconPath = Join-Path (Resolve-Path ".").Path "assets\icons\app.ico"
+$IconPath = Join-Path (Resolve-Path ".").Path "assets\icons\rabat-logo.jpg"
 $HasIcon = Test-Path $IconPath
 
 $addData = @(
@@ -45,7 +45,8 @@ $pyArgs = @(
   "--name", $AppName,
   "--windowed"
 )
-if ($HasIcon) { $pyArgs += @("--icon", $IconPath) }
+# For PyInstaller icon, prefer .ico. If using a non-ico image, skip icon to avoid errors.
+if ($HasIcon -and ($IconPath.ToLower().EndsWith('.ico'))) { $pyArgs += @("--icon", $IconPath) }
 foreach ($pair in $addData) { $pyArgs += @("--add-data", $pair) }
 $pyArgs += @("app\main.py")
 
