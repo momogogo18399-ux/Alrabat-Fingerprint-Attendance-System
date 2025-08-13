@@ -3,27 +3,29 @@ from PyQt6.QtWidgets import (
     QPushButton, QMessageBox, QApplication
 )
 from PyQt6.QtGui import QFont
-from PyQt6.QtCore import Qt, QCoreApplication
+from PyQt6.QtCore import Qt, QCoreApplication, QSettings
+
+# استيراد الوحدات اللازمة من مشروعنا
 from app.database.database_manager import DatabaseManager
 from app.utils.encryption import check_password
 from app.main_window import MainWindow
 
 class LoginWindow(QMainWindow):
     """
-    The main login window for the application.
-    Authenticates users before granting access to the main dashboard.
+    نافذة تسجيل الدخول الرئيسية للتطبيق.
+    تقوم بالتحقق من هوية المستخدمين قبل منحهم الوصول إلى لوحة التحكم.
     """
     def __init__(self):
         super().__init__()
         self.db_manager = DatabaseManager()
-        self.main_win = None  # To hold a reference to the main window
+        self.main_win = None  # للاحتفاظ بمرجع للنافذة الرئيسية
 
         self.setWindowTitle(self.tr("Login - Attendance Management System"))
         self.setFixedSize(400, 300)
         self.setup_ui()
 
     def setup_ui(self):
-        """Creates and arranges the UI elements for the window."""
+        """تنشئ وتنظم عناصر واجهة المستخدم للنافذة."""
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
@@ -43,21 +45,28 @@ class LoginWindow(QMainWindow):
 
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText(self.tr("Password"))
-        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.password_input.setEchoMode(QLineEdit.EchoMode.Password) # لإخفاء كلمة المرور
         self.password_input.setFixedHeight(35)
-        # Allow login by pressing Enter in the password field
+        # السماح بتسجيل الدخول عند الضغط على Enter في حقل كلمة المرور
         self.password_input.returnPressed.connect(self.handle_login)
         layout.addWidget(self.password_input)
 
         login_button = QPushButton(self.tr("Login"))
         login_button.setFixedHeight(40)
-        # The stylesheet is now handled globally by main.py, so we remove the line below
-        # login_button.setStyleSheet("...") 
         login_button.clicked.connect(self.handle_login)
         layout.addWidget(login_button)
 
+        # تذكّر آخر اسم مستخدم
+        try:
+            settings = QSettings("AttendanceApp", "AdminPanel")
+            last_username = settings.value("last_username", "")
+            if last_username:
+                self.username_input.setText(last_username)
+        except Exception:
+            pass
+
     def handle_login(self):
-        """Handles the user login attempt."""
+        """تعالج محاولة تسجيل دخول المستخدم."""
         username = self.username_input.text().strip()
         password = self.password_input.text()
 
@@ -71,9 +80,16 @@ class LoginWindow(QMainWindow):
 
         user_data = self.db_manager.get_user_by_username(username)
 
-        # Check if user exists and password is correct
+        # التحقق من وجود المستخدم وصحة كلمة المرور
         if user_data and check_password(password, user_data['password']):
-            # On successful login, open the main window and close this one
+            # حفظ آخر اسم مستخدم ناجح
+            try:
+                settings = QSettings("AttendanceApp", "AdminPanel")
+                settings.setValue("last_username", username)
+            except Exception:
+                pass
+            # عند النجاح، افتح النافذة الرئيسية وأغلق نافذة تسجيل الدخول
+            # نمرر نسخة التطبيق (app instance) للسماح بالتحكم في الثيم واللغة
             self.main_win = MainWindow(user_data, QApplication.instance())
             self.main_win.show()
             self.close()
@@ -85,5 +101,5 @@ class LoginWindow(QMainWindow):
             )
     
     def tr(self, text):
-        """Helper function for translation."""
+        """دالة مساعدة للترجمة."""
         return QCoreApplication.translate("LoginWindow", text)

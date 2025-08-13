@@ -1,0 +1,70 @@
+name: Build and Release Windows Installer
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Inno Setup
+        uses: crazy-max/ghaction-chocolatey@v3
+        with:
+          args: install innosetup --yes
+
+      - name: Set APP_VERSION from tag
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if ($tag -match '^v(.+)$') { $ver = $Matches[1] } else { $ver = $tag }
+          echo "APP_VERSION=$ver" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Build Installer
+        shell: pwsh
+        run: |
+          .\deploy\build_installer.ps1
+        env:
+          APP_VERSION: ${{ env.APP_VERSION }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AttendanceAdminInstaller
+          path: deploy/output/AttendanceAdminInstaller.exe
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: AttendanceAdminInstaller
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            AttendanceAdminInstaller.exe
+          fail_on_unmatched_files: true
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: |
+            Auto-generated release for ${{ github.ref_name }}.
+            Includes Windows installer.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+

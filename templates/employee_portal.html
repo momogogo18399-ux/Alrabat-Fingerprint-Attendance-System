@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام بصمة الموظفين</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+        .logo { font-size: 48px; margin-bottom: 20px; }
+        h1 { color: #333; margin-bottom: 10px; }
+        .subtitle { color: #666; margin-bottom: 30px; }
+        .input-group { margin-bottom: 20px; }
+        input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+            text-align: center;
+        }
+        input:focus { outline: none; border-color: #667eea; }
+        .btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 10px;
+            transition: transform 0.2s;
+        }
+        .btn:hover { transform: translateY(-2px); }
+        .btn-checkin { background: #10b981; color: white; }
+        .btn-checkout { background: #ef4444; color: white; }
+        .status { padding: 15px; border-radius: 10px; margin: 20px 0; }
+        .status.success { background: #d1fae5; color: #065f46; }
+        .status.error { background: #fee2e2; color: #991b1b; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">👤</div>
+        <h1>نظام بصمة الموظفين</h1>
+        <p class="subtitle">تسجيل الحضور والانصراف</p>
+        
+        <div class="input-group">
+            <input type="text" id="employee-input" placeholder="الكود الوظيفي أو رقم الهاتف">
+        </div>
+        
+        <div id="dashboard" class="hidden">
+            <div id="employee-info"></div>
+            <button class="btn btn-checkin" id="checkin-btn">تسجيل حضور</button>
+            <button class="btn btn-checkout" id="checkout-btn">تسجيل انصراف</button>
+        </div>
+        
+        <div id="message"></div>
+    </div>
+
+    <script>
+        let deviceFingerprint = null;
+        let deviceToken = null;
+        let currentLocation = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeFingerprint();
+            getLocation();
+            setupEventListeners();
+        });
+
+        function initializeFingerprint() {
+            // Simple device fingerprint
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.textBaseline = "top";
+            ctx.font = "14px Arial";
+            ctx.fillText("Device fingerprint", 2, 2);
+            deviceFingerprint = canvas.toDataURL();
+            
+            deviceToken = localStorage.getItem('device_token') || 'token_' + Date.now();
+            localStorage.setItem('device_token', deviceToken);
+        }
+
+        function getLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        currentLocation = {
+                            lat: position.coords.latitude,
+                            lon: position.coords.longitude
+                        };
+                    },
+                    (error) => {
+                        console.error('Location error:', error);
+                    }
+                );
+            }
+        }
+
+        function setupEventListeners() {
+            const input = document.getElementById('employee-input');
+            const checkinBtn = document.getElementById('checkin-btn');
+            const checkoutBtn = document.getElementById('checkout-btn');
+
+            input.addEventListener('input', debounce(fetchEmployeeStatus, 500));
+            checkinBtn.addEventListener('click', () => recordAttendance('Check-In'));
+            checkoutBtn.addEventListener('click', () => recordAttendance('Check-Out'));
+        }
+
+        async function fetchEmployeeStatus() {
+            const identifier = document.getElementById('employee-input').value.trim();
+            
+            if (identifier.length < 4) {
+                hideDashboard();
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/employee-status?identifier=${encodeURIComponent(identifier)}`);
+                const data = await response.json();
+                
+                if (data.status === 'found') {
+                    showEmployeeDashboard(data);
+                } else {
+                    showError('لم يتم العثور على الموظف');
+                }
+            } catch (error) {
+                showError('خطأ في الاتصال بالخادم');
+            }
+        }
+
+        function showEmployeeDashboard(data) {
+            const dashboard = document.getElementById('dashboard');
+            const employeeInfo = document.getElementById('employee-info');
+            const checkinBtn = document.getElementById('checkin-btn');
+            const checkoutBtn = document.getElementById('checkout-btn');
+
+            employeeInfo.innerHTML = `
+                <h3>مرحباً ${data.employee_name}</h3>
+                <p>المسمى الوظيفي: ${data.job_title || 'غير محدد'}</p>
+                <p>حضور الشهر: ${data.stats?.monthly_attendance || 0} يوم</p>
+            `;
+
+            checkinBtn.style.display = data.next_action === 'Check-In' ? 'block' : 'none';
+            checkoutBtn.style.display = data.next_action === 'Check-Out' ? 'block' : 'none';
+
+            dashboard.classList.remove('hidden');
+        }
+
+        function hideDashboard() {
+            document.getElementById('dashboard').classList.add('hidden');
+        }
+
+        async function recordAttendance(type) {
+            if (!currentLocation) {
+                showError('يرجى السماح بتحديد الموقع');
+                return;
+            }
+
+            const identifier = document.getElementById('employee-input').value.trim();
+            
+            try {
+                const payload = {
+                    identifier: identifier,
+                    fingerprint: deviceFingerprint,
+                    token: deviceToken,
+                    location: currentLocation,
+                    type: type,
+                    notes: ''
+                };
+
+                const response = await fetch('/api/check-in', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showSuccess(result.message || 'تم التسجيل بنجاح');
+                    await fetchEmployeeStatus();
+                } else {
+                    showError(result.message || 'حدث خطأ أثناء التسجيل');
+                }
+            } catch (error) {
+                showError('خطأ في الاتصال بالخادم');
+            }
+        }
+
+        function showSuccess(message) {
+            showMessage(message, 'success');
+        }
+
+        function showError(message) {
+            showMessage(message, 'error');
+        }
+
+        function showMessage(message, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = message;
+            messageDiv.className = `status ${type}`;
+            
+            setTimeout(() => {
+                messageDiv.className = 'status hidden';
+            }, 5000);
+        }
+
+        function debounce(func, wait) {
+            let timeout;
+            return function(...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
+    </script>
+</body>
+</html> 

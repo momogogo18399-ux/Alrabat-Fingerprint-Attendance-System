@@ -1,0 +1,1411 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-key="page-title">بوابة الموظف الذكية</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --secondary: #64748b;
+            --success: #10b981;
+            --error: #ef4444;
+            --warning: #f59e0b;
+            --info: #06b6d4;
+            
+            --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --gradient-success: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            --gradient-error: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            --gradient-bg: linear-gradient(135deg, #f093fb 0%, #f5576c 50%, #4facfe 100%);
+            
+            --font-ar: 'Cairo', sans-serif;
+            --font-en: 'Inter', sans-serif;
+            
+            --radius: 16px;
+            --radius-lg: 24px;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.15);
+            --blur: blur(16px);
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Light Theme */
+        html[data-theme='light'] {
+            --bg-body: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            --bg-card: rgba(255, 255, 255, 0.95);
+            --bg-input: rgba(255, 255, 255, 0.9);
+            --bg-glass: rgba(255, 255, 255, 0.2);
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --text-accent: #3b82f6;
+            --border: rgba(255, 255, 255, 0.3);
+            --shadow-color: rgba(0, 0, 0, 0.1);
+        }
+
+        /* Dark Theme */
+        html[data-theme='dark'] {
+            --bg-body: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+            --bg-card: rgba(30, 41, 59, 0.95);
+            --bg-input: rgba(51, 65, 85, 0.9);
+            --bg-glass: rgba(51, 65, 85, 0.3);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-accent: #38bdf8;
+            --border: rgba(51, 65, 85, 0.5);
+            --shadow-color: rgba(0, 0, 0, 0.3);
+        }
+
+        /* Desert Theme */
+        html[data-theme='desert'] {
+            --bg-body: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
+            --bg-card: rgba(254, 243, 199, 0.95);
+            --bg-input: rgba(253, 230, 138, 0.9);
+            --bg-glass: rgba(251, 191, 36, 0.2);
+            --text-primary: #92400e;
+            --text-secondary: #b45309;
+            --text-accent: #d97706;
+            --border: rgba(251, 191, 36, 0.3);
+            --shadow-color: rgba(146, 64, 14, 0.1);
+        }
+
+        /* Synthwave Theme */
+        html[data-theme='synthwave'] {
+            --bg-body: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #6366f1 100%);
+            --bg-card: rgba(59, 130, 246, 0.1);
+            --bg-input: rgba(79, 70, 229, 0.2);
+            --bg-glass: rgba(147, 51, 234, 0.2);
+            --text-primary: #f0f9ff;
+            --text-secondary: #a78bfa;
+            --text-accent: #c084fc;
+            --border: rgba(147, 51, 234, 0.3);
+            --shadow-color: rgba(147, 51, 234, 0.2);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-ar);
+            background: var(--bg-body);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        html[dir="ltr"] body {
+            font-family: var(--font-en);
+        }
+
+        /* Animated Background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 25% 25%, rgba(59, 130, 246, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 75% 75%, rgba(236, 72, 153, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.2) 0%, transparent 50%);
+            animation: float 20s ease-in-out infinite;
+            z-index: -1;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(-20px, -20px) rotate(120deg); }
+            66% { transform: translate(20px, 20px) rotate(240deg); }
+        }
+
+        /* Header */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg-glass);
+            backdrop-filter: var(--blur);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            z-index: 1000;
+            animation: slideDown 0.6s ease;
+        }
+
+        @keyframes slideDown {
+            from { transform: translateY(-100%); }
+            to { transform: translateY(0); }
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--text-accent);
+        }
+
+        .logo i {
+            font-size: 2rem;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            border-radius: 50px;
+            padding: 0.25rem;
+            backdrop-filter: var(--blur);
+        }
+
+        .control-btn {
+            background: none;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: 1rem;
+            font-weight: 600;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .control-btn:hover {
+            color: var(--text-primary);
+            transform: scale(1.05);
+        }
+
+        .control-btn.active {
+            background: var(--gradient-primary);
+            color: white;
+            transform: scale(1.02);
+        }
+
+        /* Main Container */
+        .container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            margin-top: 5rem;
+        }
+
+        .main-card {
+            width: 100%;
+            max-width: 480px;
+            background: var(--bg-card);
+            backdrop-filter: var(--blur);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            padding: 2.5rem;
+            position: relative;
+            overflow: hidden;
+            animation: fadeInUp 0.8s ease;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .main-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--gradient-primary);
+            border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        }
+
+        /* Title Section */
+        .title-section {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .title {
+            font-size: 2rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .clock {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+            margin-top: 1rem;
+        }
+
+        .time {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-accent);
+        }
+
+        .date {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        /* Input Section */
+        .input-section {
+            margin-bottom: 2rem;
+        }
+
+        .input-container {
+            position: relative;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--bg-input);
+            border: 2px solid transparent;
+            transition: var(--transition);
+        }
+
+        .input-container:focus-within {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 1.25rem 3.5rem 1.25rem 1.25rem;
+            font-size: 1.125rem;
+            font-weight: 500;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text-primary);
+            text-align: center;
+            direction: ltr;
+            font-family: 'Inter', 'Courier New', monospace;
+            letter-spacing: 1px;
+        }
+
+        [dir="rtl"] .input-field {
+            padding: 1.25rem 1.25rem 1.25rem 3.5rem;
+        }
+
+        .input-field::placeholder {
+            color: var(--text-secondary);
+            font-family: var(--font-ar);
+            letter-spacing: normal;
+            opacity: 0.7;
+        }
+
+        html[dir="ltr"] .input-field::placeholder {
+            font-family: var(--font-en);
+        }
+
+        .clear-btn {
+            position: absolute;
+            top: 50%;
+            right: 1rem;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.25rem;
+            cursor: pointer;
+            opacity: 0;
+            visibility: hidden;
+            transition: var(--transition);
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        [dir="rtl"] .clear-btn {
+            right: auto;
+            left: 1rem;
+        }
+
+        .clear-btn:hover {
+            background: var(--error);
+            color: white;
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        .input-field:not(:placeholder-shown) + .clear-btn {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Dashboard */
+        .dashboard {
+            opacity: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .dashboard.visible {
+            opacity: 1;
+            max-height: 1000px;
+        }
+
+        /* Profile Card */
+        .profile-card {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            background: var(--bg-glass);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            backdrop-filter: var(--blur);
+            border: 1px solid var(--border);
+            animation: slideInRight 0.6s ease;
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .avatar-container {
+            position: relative;
+        }
+
+        .avatar {
+            width: 4rem;
+            height: 4rem;
+            border-radius: 50%;
+            border: 3px solid var(--primary);
+            object-fit: cover;
+            background: var(--bg-glass);
+        }
+
+        .status-dot {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 1rem;
+            height: 1rem;
+            background: var(--success);
+            border: 2px solid white;
+            border-radius: 50%;
+            animation: statusPulse 2s infinite;
+        }
+
+        @keyframes statusPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+
+        .profile-info {
+            flex: 1;
+            text-align: right;
+        }
+
+        [dir="ltr"] .profile-info {
+            text-align: left;
+        }
+
+        .profile-name {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .profile-title {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card {
+            background: var(--bg-glass);
+            border-radius: var(--radius);
+            padding: 1.25rem;
+            text-align: center;
+            backdrop-filter: var(--blur);
+            border: 1px solid var(--border);
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--gradient-primary);
+            transform: translateX(-100%);
+            transition: transform 0.5s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .stat-card:hover::before {
+            transform: translateX(0);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 1.75rem;
+            font-weight: 800;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-unit {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        /* Action Area */
+        .action-area {
+            margin-top: 1.5rem;
+        }
+
+        .reason-group {
+            margin-bottom: 1rem;
+            opacity: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.4s ease;
+        }
+
+        .reason-group.visible {
+            opacity: 1;
+            max-height: 100px;
+        }
+
+        .reason-select {
+            width: 100%;
+            padding: 0.875rem;
+            background: var(--bg-input);
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            font-family: var(--font-ar);
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            transition: var(--transition);
+        }
+
+        html[dir="ltr"] .reason-select {
+            font-family: var(--font-en);
+        }
+
+        .reason-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .action-btn {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            font-family: var(--font-ar);
+            font-size: 1rem;
+            font-weight: 700;
+            padding: 1rem 1.5rem;
+            border: none;
+            border-radius: var(--radius);
+            color: white;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        html[dir="ltr"] .action-btn {
+            font-family: var(--font-en);
+        }
+
+        .action-btn.visible {
+            display: flex;
+            animation: bounceIn 0.6s ease;
+        }
+
+        @keyframes bounceIn {
+            0% {
+                opacity: 0;
+                transform: scale(0.3);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.05);
+            }
+            70% {
+                transform: scale(0.9);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .action-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            transition: left 0.6s;
+        }
+
+        .action-btn:hover::before {
+            left: 100%;
+        }
+
+        .action-btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn-check-in {
+            background: var(--gradient-success);
+        }
+
+        .btn-check-out {
+            background: var(--gradient-error);
+        }
+
+        .action-btn i {
+            font-size: 1.25rem;
+        }
+
+        /* Today's Log */
+        .log-section {
+            margin-top: 2rem;
+            opacity: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.6s ease;
+        }
+
+        .log-section.visible {
+            opacity: 1;
+            max-height: 400px;
+        }
+
+        .log-title {
+            font-size: 1.125rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--text-accent);
+            text-align: center;
+            padding-top: 1rem;
+            border-top: 2px solid var(--border);
+            position: relative;
+        }
+
+        .log-title::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 4px;
+            background: var(--gradient-primary);
+            border-radius: 2px;
+        }
+
+        .log-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .log-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-glass);
+            padding: 1rem 1.25rem;
+            border-radius: var(--radius);
+            backdrop-filter: var(--blur);
+            border: 1px solid var(--border);
+            transition: var(--transition);
+            animation: slideInLeft 0.5s ease;
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .log-item:hover {
+            transform: translateX(5px);
+            box-shadow: var(--shadow);
+        }
+
+        .log-type {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 600;
+        }
+
+        .log-type i {
+            font-size: 1.125rem;
+            color: var(--text-accent);
+        }
+
+        .log-time {
+            font-weight: 700;
+            color: var(--text-accent);
+            background: var(--bg-glass);
+            padding: 0.375rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+        }
+
+        /* Message */
+        .message {
+            margin-top: 1.25rem;
+            padding: 1rem 1.25rem;
+            border-radius: var(--radius);
+            font-weight: 600;
+            text-align: center;
+            opacity: 0;
+            transform: translateY(20px);
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .message.visible {
+            opacity: 1;
+            transform: translateY(0);
+            max-height: 100px;
+        }
+
+        .msg-success {
+            background: rgba(79, 172, 254, 0.1);
+            color: var(--info);
+            border: 1px solid rgba(79, 172, 254, 0.3);
+        }
+
+        .msg-error {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .msg-info {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--primary);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        /* Hidden */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                padding: 0.75rem 1rem;
+            }
+
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .main-card {
+                margin-top: 2rem;
+                padding: 2rem 1.5rem;
+                max-width: 95%;
+            }
+
+            .title {
+                font-size: 1.75rem;
+            }
+
+            .profile-card {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .profile-info {
+                text-align: center;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .time {
+                font-size: 1.25rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">
+                <i class="ph-bold ph-buildings"></i>
+                <span data-key="main-title">بوابة الموظف الذكية</span>
+            </div>
+            
+            <div class="controls">
+                <div class="control-group" id="theme-switcher">
+                    <button class="control-btn" data-theme="light" title="Light Theme">
+                        <i class="ph-bold ph-sun"></i>
+                    </button>
+                    <button class="control-btn" data-theme="dark" title="Dark Theme">
+                        <i class="ph-bold ph-moon"></i>
+                    </button>
+                    <button class="control-btn" data-theme="desert" title="Desert Theme">
+                        <i class="ph-bold ph-cactus"></i>
+                    </button>
+                    <button class="control-btn" data-theme="synthwave" title="Synthwave Theme">
+                        <i class="ph-bold ph-radio"></i>
+                    </button>
+                </div>
+                <div class="control-group" id="lang-switcher">
+                    <button class="control-btn" data-lang="ar" title="العربية">
+                        <span>ع</span>
+                    </button>
+                    <button class="control-btn" data-lang="en" title="English">
+                        <span>En</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <div class="main-card">
+            <!-- Title Section -->
+            <div class="title-section">
+                <h1 class="title" data-key="main-title">بوابة الموظف الذكية</h1>
+                <div class="clock">
+                    <div class="time" id="clock-time"></div>
+                    <div class="date" id="clock-date"></div>
+                </div>
+            </div>
+
+            <!-- Input Section -->
+            <div class="input-section">
+                <div class="input-container">
+                    <input 
+                        type="text" 
+                        id="identifier-input" 
+                        class="input-field" 
+                        data-key-placeholder="identifier-placeholder" 
+                        placeholder="الكود الوظيفي أو رقم الهاتف" 
+                        autocomplete="off"
+                        spellcheck="false"
+                        inputmode="text"
+                    >
+                    <button id="clear-input-btn" class="clear-btn" type="button">
+                        <i class="ph-bold ph-x-circle"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Dashboard -->
+            <div id="dashboard" class="dashboard hidden">
+                <!-- Profile Card -->
+                <div class="profile-card">
+                    <div class="avatar-container">
+                        <img id="profile-pic" class="avatar" src="" alt="Avatar">
+                        <div class="status-dot"></div>
+                    </div>
+                    <div class="profile-info">
+                        <h2 id="welcome-message" class="profile-name"></h2>
+                        <p id="job-title-display" class="profile-title"></p>
+                    </div>
+                </div>
+
+                <!-- Stats Grid -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label" data-key="status-today">حالة اليوم</div>
+                        <div class="stat-value" id="current-status"></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label" data-key="monthly-attendance">حضور الشهر</div>
+                        <div class="stat-value" id="monthly-attendance-stat">0</div>
+                        <div class="stat-unit" data-key="day">يوم</div>
+                    </div>
+                </div>
+
+                <!-- Action Area -->
+                <div class="action-area">
+                    <div id="late-reason-group" class="reason-group hidden">
+                        <select id="late-reason" class="reason-select">
+                            <option value="" data-key="no-reason">-- تحديد سبب التأخير (اختياري) --</option>
+                            <option value="إذن تأخير" data-key="late-permission">إذن تأخير</option>
+                            <option value="مأمورية صباحية" data-key="morning-mission">مأمورية صباحية</option>
+                            <option value="ظرف طارئ" data-key="emergency">ظرف طارئ</option>
+                        </select>
+                    </div>
+                    <div class="action-buttons">
+                        <button id="check-in-btn" class="btn-check-in action-btn" data-key="check-in-btn">
+                            <i class="ph-bold ph-sign-in"></i>
+                            <span>تسجيل حضور</span>
+                        </button>
+                        <button id="check-out-btn" class="btn-check-out action-btn" data-key="check-out-btn">
+                            <i class="ph-bold ph-sign-out"></i>
+                            <span>تسجيل انصراف</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Message -->
+            <div id="message" class="message"></div>
+
+            <!-- Today's Log -->
+            <div id="todays-log" class="log-section hidden">
+                <h3 class="log-title" data-key="todays-log-title">سجل اليوم</h3>
+                <ul id="todays-log-list" class="log-list"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- TRANSLATIONS ---
+        const translations = {
+            en: {
+                'page-title': 'Smart Employee Portal',
+                'main-title': 'Smart Employee Portal',
+                'identifier-placeholder': 'Enter Employee Code or Phone',
+                'status-today': "Today's Status",
+                'monthly-attendance': 'Monthly Attendance',
+                'day': 'Day(s)',
+                'no-reason': '-- Select reason (optional) --',
+                'late-permission': 'Late Permission',
+                'morning-mission': 'Morning Mission',
+                'emergency': 'Emergency',
+                'check-in-btn': 'Check In',
+                'check-out-btn': 'Check Out',
+                'todays-log-title': "Today's Log",
+                'welcome': 'Welcome,',
+                'status-in': '✅ You are IN',
+                'status-out': '❌ You are OUT',
+                'log-in': 'Check-In',
+                'log-out': 'Check-Out',
+                'not-found-name': 'Unknown Employee',
+                'not-found-status': 'Please check the Code or Phone Number.',
+                'server-error': 'Cannot connect to the server.',
+                'processing': 'Processing...',
+                'check-in-icon': 'ph-bold ph-sign-in',
+                'check-out-icon': 'ph-bold ph-sign-out'
+            },
+            ar: {
+                'page-title': 'بوابة الموظف الذكية',
+                'main-title': 'بوابة الموظف الذكية',
+                'identifier-placeholder': 'الكود الوظيفي أو رقم الهاتف',
+                'status-today': 'حالة اليوم',
+                'monthly-attendance': 'حضور الشهر',
+                'day': 'يوم',
+                'no-reason': '-- تحديد سبب التأخير (اختياري) --',
+                'late-permission': 'إذن تأخير',
+                'morning-mission': 'مأمورية صباحية',
+                'emergency': 'ظرف طارئ',
+                'check-in-btn': 'تسجيل حضور',
+                'check-out-btn': 'تسجيل انصراف',
+                'todays-log-title': 'سجل اليوم',
+                'welcome': 'مرحباً،',
+                'status-in': '✅ أنت بالداخل',
+                'status-out': '❌ أنت بالخارج',
+                'log-in': 'حضور',
+                'log-out': 'انصراف',
+                'not-found-name': 'موظف غير معروف',
+                'not-found-status': 'يرجى التأكد من الكود أو رقم الهاتف.',
+                'server-error': 'لا يمكن الاتصال بالخادم.',
+                'processing': 'جاري المعالجة...',
+                'check-in-icon': 'ph-bold ph-sign-in',
+                'check-out-icon': 'ph-bold ph-sign-out'
+            }
+        };
+
+        // --- DOM ELEMENTS ---
+        const identifierInput = document.getElementById('identifier-input');
+        const dashboard = document.getElementById('dashboard');
+        const checkInButton = document.getElementById('check-in-btn');
+        const checkOutButton = document.getElementById('check-out-btn');
+        const welcomeMessage = document.getElementById('welcome-message');
+        const jobTitleDisplay = document.getElementById('job-title-display');
+        const profilePic = document.getElementById('profile-pic');
+        const currentStatus = document.getElementById('current-status');
+        const monthlyAttendanceStat = document.getElementById('monthly-attendance-stat');
+        const lateReasonGroup = document.getElementById('late-reason-group');
+        const lateReasonSelect = document.getElementById('late-reason');
+        const todaysLog = document.getElementById('todays-log');
+        const todaysLogList = document.getElementById('todays-log-list');
+        const messageDiv = document.getElementById('message');
+        const clockTime = document.getElementById('clock-time');
+        const clockDate = document.getElementById('clock-date');
+        const themeSwitcher = document.getElementById('theme-switcher');
+        const langSwitcher = document.getElementById('lang-switcher');
+        const clearInputBtn = document.getElementById('clear-input-btn');
+
+        let messageTimer;
+        const DEVICE_TOKEN_KEY = 'attendance_device_token';
+        let currentLang = localStorage.getItem('language') || 'ar';
+        let currentTheme = localStorage.getItem('theme') || 'light';
+
+        // --- LANGUAGE & THEME FUNCTIONS ---
+        const setLanguage = (lang) => {
+            currentLang = lang;
+            localStorage.setItem('language', lang);
+            document.documentElement.lang = lang;
+            document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+            
+            // Update all translated elements
+            document.querySelectorAll('[data-key]').forEach(el => {
+                const key = el.getAttribute('data-key');
+                if (translations[lang][key]) {
+                    el.textContent = translations[lang][key];
+                }
+            });
+            
+            // Update placeholders
+            document.querySelectorAll('[data-key-placeholder]').forEach(el => {
+                const key = el.getAttribute('data-key-placeholder');
+                if (translations[lang][key]) {
+                    el.placeholder = translations[lang][key];
+                }
+            });
+            
+            // Update button text content
+            const checkInBtn = document.querySelector('#check-in-btn span');
+            const checkOutBtn = document.querySelector('#check-out-btn span');
+            if (checkInBtn) checkInBtn.textContent = translations[lang]['check-in-btn'];
+            if (checkOutBtn) checkOutBtn.textContent = translations[lang]['check-out-btn'];
+            
+            // Update active language button
+            langSwitcher.querySelector('.active')?.classList.remove('active');
+            langSwitcher.querySelector(`[data-lang="${lang}"]`).classList.add('active');
+            
+            fetchEmployeeStatus();
+        };
+
+        const setTheme = (theme) => {
+            currentTheme = theme;
+            localStorage.setItem('theme', theme);
+            document.documentElement.setAttribute('data-theme', theme);
+            
+            // Update active theme button
+            themeSwitcher.querySelector('.active')?.classList.remove('active');
+            themeSwitcher.querySelector(`[data-theme="${theme}"]`).classList.add('active');
+        };
+
+        // --- EVENT LISTENERS ---
+        themeSwitcher.addEventListener('click', (e) => {
+            const button = e.target.closest('.control-btn');
+            if (button && button.dataset.theme) {
+                setTheme(button.dataset.theme);
+            }
+        });
+
+        langSwitcher.addEventListener('click', (e) => {
+            const button = e.target.closest('.control-btn');
+            if (button && button.dataset.lang) {
+                setLanguage(button.dataset.lang);
+            }
+        });
+
+        clearInputBtn.addEventListener('click', () => {
+            identifierInput.value = '';
+            identifierInput.focus();
+            updateDashboard(null, 'initial');
+        });
+
+        identifierInput.addEventListener('input', debounce(fetchEmployeeStatus, 500));
+        checkInButton.addEventListener('click', () => recordAttendance('Check-In'));
+        checkOutButton.addEventListener('click', () => recordAttendance('Check-Out'));
+
+        // --- INITIALIZE ---
+        setTheme(currentTheme);
+        setLanguage(currentLang);
+        updateClock();
+        getOrGenerateDeviceToken();
+        setInterval(updateClock, 1000);
+
+        // Focus on input field after page load
+        setTimeout(() => {
+            identifierInput.focus();
+        }, 500);
+
+        // --- CLOCK FUNCTION ---
+        function updateClock() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', {
+                hour12: true,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            const dateString = now.toLocaleDateString(
+                currentLang === 'ar' ? 'ar-EG' : 'en-US',
+                {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                }
+            );
+            
+            clockTime.textContent = timeString;
+            clockDate.textContent = dateString;
+        }
+
+        // --- EMPLOYEE STATUS FUNCTION ---
+        async function fetchEmployeeStatus() {
+            clearMessage();
+            const identifier = identifierInput.value.trim();
+            
+            if (identifier.length < 4) {
+                updateDashboard(null, 'initial');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/employee-status?identifier=${identifier}`);
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        updateDashboard(null, 'not_found');
+                    } else {
+                        throw new Error('Server returned an error');
+                    }
+                } else {
+                    const result = await response.json();
+                    updateDashboard(result, result.status || 'found');
+                }
+            } catch (error) {
+                console.error("Error fetching status:", error);
+                updateDashboard(null, 'error');
+            }
+        }
+
+        // --- ATTENDANCE RECORDING FUNCTION ---
+        async function recordAttendance(type) {
+            showMessage(translations[currentLang]['processing'], 'info');
+            const identifier = identifierInput.value.trim();
+            let success = false;
+
+            try {
+                const notes = lateReasonSelect.value;
+                const deviceToken = getOrGenerateDeviceToken();
+                const location = await getLocation();
+                const fingerprint = await getCanvasFingerprint();
+                const payload = {
+                    identifier,
+                    fingerprint,
+                    location,
+                    type,
+                    notes,
+                    token: deviceToken
+                };
+
+                const response = await fetch('/api/check-in', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                showMessage(result.message, response.ok ? 'success' : 'error');
+                if (response.ok) {
+                    success = true;
+                }
+            } catch (error) {
+                showMessage(error.message || 'حدث خطأ فني.', 'error');
+            } finally {
+                if (success) {
+                    await fetchEmployeeStatus();
+                }
+            }
+        }
+
+        // --- DASHBOARD UPDATE FUNCTION ---
+        function updateDashboard(data, state) {
+            dashboard.classList.add('hidden');
+            dashboard.classList.remove('visible');
+            todaysLog.classList.add('hidden');
+            todaysLog.classList.remove('visible');
+            checkInButton.classList.remove('visible');
+            checkOutButton.classList.remove('visible');
+            lateReasonGroup.classList.add('hidden');
+            lateReasonGroup.classList.remove('visible');
+
+            setTimeout(() => {
+                switch (state) {
+                    case 'found':
+                        dashboard.classList.remove('hidden');
+                        setTimeout(() => dashboard.classList.add('visible'), 50);
+                        
+                        welcomeMessage.textContent = `${translations[currentLang]['welcome']} ${data.employee_name}`;
+                        jobTitleDisplay.textContent = data.job_title || '';
+                        profilePic.src = data.profile_pic_url || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzY0NzQ4YiI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgM2MxLjY2IDAgMyAxLjM0IDMgMy4xMi0uMDQgMS43Ny0xLjQgMy4xLTMgMy4xcy0zLTEuMzQtMy0zYzAtMS42NiAxLjM0LTMgMy0zem0wIDE0LjJjLTIuNSAwLTQuNzEtMS4yOC02LTYuNzIgMS40Ny0yLjIgMy41OC0zLjUgNi0zLjUgMi40MiAwIDQuNTMgMS4yOSA2IDMuNTEtMS4yOSA1LjQzLTMuNSAzLjIxLTYgMy4yMXoiLz48L3N2Zz4=';
+                        monthlyAttendanceStat.textContent = data.stats.monthly_attendance;
+
+                        const lastCheckIn = data.todays_log.filter(log => log.type === 'Check-In').pop();
+                        const lastCheckOut = data.todays_log.filter(log => log.type === 'Check-Out').pop();
+                        const checkInTime = lastCheckIn ? new Date(`1970-01-01T${lastCheckIn.check_time}`) : null;
+                        const checkOutTime = lastCheckOut ? new Date(`1970-01-01T${lastCheckOut.check_time}`) : null;
+
+                        if (checkInTime && (!checkOutTime || checkOutTime < checkInTime)) {
+                            currentStatus.innerHTML = translations[currentLang]['status-in'];
+                        } else {
+                            currentStatus.innerHTML = translations[currentLang]['status-out'];
+                        }
+
+                        if (data.next_action === 'Check-In') {
+                            setTimeout(() => checkInButton.classList.add('visible'), 200);
+                            if (data.is_late) {
+                                setTimeout(() => {
+                                    lateReasonGroup.classList.remove('hidden');
+                                    lateReasonGroup.classList.add('visible');
+                                }, 300);
+                            }
+                        } else if (data.next_action === 'Check-Out') {
+                            setTimeout(() => checkOutButton.classList.add('visible'), 200);
+                        }
+
+                        if (data.todays_log && data.todays_log.length > 0) {
+                            setTimeout(() => {
+                                todaysLog.classList.remove('hidden');
+                                todaysLog.classList.add('visible');
+                            }, 400);
+                            
+                            todaysLogList.innerHTML = '';
+                            data.todays_log.sort((a, b) => (b.id || 0) - (a.id || 0)).forEach((log, index) => {
+                                const li = document.createElement('li');
+                                li.className = 'log-item';
+                                li.style.animationDelay = `${index * 0.1}s`;
+                                
+                                const typeText = translations[currentLang][log.type === 'Check-In' ? 'log-in' : 'log-out'];
+                                const iconClass = translations[currentLang][log.type === 'Check-In' ? 'check-in-icon' : 'check-out-icon'];
+                                
+                                li.innerHTML = `
+                                    <div class="log-type">
+                                        <i class="${iconClass}"></i> 
+                                        ${typeText}
+                                    </div>
+                                    <div class="log-time">${log.check_time}</div>
+                                `;
+                                todaysLogList.appendChild(li);
+                            });
+                        }
+                        break;
+
+                    case 'not_found':
+                        dashboard.classList.remove('hidden');
+                        setTimeout(() => dashboard.classList.add('visible'), 50);
+                        
+                        welcomeMessage.textContent = translations[currentLang]['not-found-name'];
+                        currentStatus.textContent = translations[currentLang]['not-found-status'];
+                        jobTitleDisplay.textContent = '';
+                        monthlyAttendanceStat.textContent = '0';
+                        profilePic.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzY0NzQ4YiI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgM2MxLjY2IDAgMyAxLjM0IDMgMy4xMi0uMDQgMS43Ny0xLjQgMy4xLTMgMy4xcy0zLTEuMzQtMy0zYzAtMS42NiAxLjM0LTMgMy0zem0wIDE0LjJjLTIuNSAwLTQuNzEtMS4yOC02LTYuNzIgMS40Ny0yLjIgMy41OC0zLjUgNi0zLjUgMi40MiAwIDQuNTMgMS4yOSA2IDMuNTEtMS4yOSA1LjQzLTMuNSAzLjIxLTYgMy4yMXoiLz48L3N2Zz4=';
+                        break;
+
+                    case 'error':
+                        showMessage(translations[currentLang]['server-error'], 'error');
+                        break;
+
+                    case 'initial':
+                    default:
+                        break;
+                }
+            }, 100);
+        }
+
+        // --- MESSAGE FUNCTIONS ---
+        function showMessage(msg, type) {
+            clearTimeout(messageTimer);
+            messageDiv.className = 'message';
+            messageDiv.classList.add(`msg-${type}`, 'visible');
+            messageDiv.textContent = msg;
+            messageTimer = setTimeout(clearMessage, 5000);
+        }
+
+        function clearMessage() {
+            messageDiv.classList.remove('visible');
+        }
+
+        // --- HELPER FUNCTIONS (Original functionality preserved) ---
+        function getLocation() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    return reject(new Error("Geolocation not supported."));
+                }
+                navigator.geolocation.getCurrentPosition(
+                    pos => resolve({
+                        lat: pos.coords.latitude,
+                        lon: pos.coords.longitude
+                    }),
+                    () => reject(new Error("Failed to get location.")),
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 15000,
+                        maximumAge: 0
+                    }
+                );
+            });
+        }
+
+        function getCanvasFingerprint() {
+            return new Promise((resolve) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const txt = 'abcdefghijklmnopqrstuvwxyz0123456789';
+                ctx.textBaseline = "top";
+                ctx.font = "14px 'Arial'";
+                ctx.textBaseline = "alphabetic";
+                ctx.fillStyle = "#f60";
+                ctx.fillRect(125, 1, 62, 20);
+                ctx.fillStyle = "#069";
+                ctx.fillText(txt, 2, 15);
+                ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
+                ctx.fillText(txt, 4, 17);
+                const dataUrl = canvas.toDataURL();
+                let hash = 0;
+                for (let i = 0; i < dataUrl.length; i++) {
+                    const char = dataUrl.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + char;
+                    hash = hash & hash;
+                }
+                resolve(hash.toString());
+            });
+        }
+
+        function generateUUID() {
+            return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
+                (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+            );
+        }
+
+        function getOrGenerateDeviceToken() {
+            let token = localStorage.getItem(DEVICE_TOKEN_KEY);
+            if (!token) {
+                token = generateUUID();
+                localStorage.setItem(DEVICE_TOKEN_KEY, token);
+            }
+            return token;
+        }
+
+        function debounce(func, delay) {
+            let timeout;
+            return function (...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), delay);
+            };
+        }
+    });
+    </script>
+</body>
+</html>
