@@ -63,12 +63,13 @@ if (!(Test-Path $ISCC)) { throw "ISCC.exe not found. Install Inno Setup 6 first.
 
 ${IssPath} = (Resolve-Path ".\deploy\installer.iss").Path
 
-# Determine app version to pass to Inno Setup
+# Determine app version to pass to Inno Setup (robust parsing)
 $EnvVersion = $env:APP_VERSION
 if (-not $EnvVersion -or $EnvVersion -eq '') {
   try {
-    $verLine = (Get-Content -Raw -Encoding UTF8 ".\app\version.py") -split "`n" | Where-Object { $_ -match 'APP_VERSION\s*=\s*"([^"]+)"' } | Select-Object -First 1
-    if ($verLine -match 'APP_VERSION\s*=\s*"([^"]+)"') { $EnvVersion = $Matches[1] }
+    $verContent = Get-Content -Raw -Encoding UTF8 ".\app\version.py"
+    $m = [regex]::Match($verContent, 'APP_VERSION\s*=\s*"(.*?)"')
+    if ($m.Success) { $EnvVersion = $m.Groups[1].Value }
   } catch {}
 }
 if (-not $EnvVersion -or $EnvVersion -eq '') { $EnvVersion = "1.0.0" }
@@ -78,7 +79,8 @@ Invoke-Step "Compile installer (Inno Setup)" { & $ISCC "/DMyAppVersion=$EnvVersi
 $OutInstaller = Join-Path (Resolve-Path ".").Path "deploy\output\AttendanceAdminInstaller.exe"
 if (Test-Path $OutInstaller) {
   Write-Host "[✓] Installer generated: $OutInstaller" -ForegroundColor Green
-} else {
+}
+if (!(Test-Path $OutInstaller)) {
   Write-Host "[!] Installer output not found in deploy\\output. Check Inno logs." -ForegroundColor Yellow
 }
 
