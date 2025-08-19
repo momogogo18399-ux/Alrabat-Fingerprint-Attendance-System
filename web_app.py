@@ -9,7 +9,7 @@ import sys
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 from app.database.database_manager import DatabaseManager
 from app.database.database_setup import setup_database
-from app.utils.notifier import NOTIFIER_HOST, NOTIFIER_PORT
+
 from app.version import APP_VERSION
 
 
@@ -374,10 +374,7 @@ def check_in():
         db_manager.update_checkout_with_duration(record_id, duration_hours)
 
     if record_id:
-        try:
-            notifier_url = f"http://{NOTIFIER_HOST}:{NOTIFIER_PORT}/notify"
-            requests.get(notifier_url, timeout=0.5)
-        except requests.exceptions.RequestException: pass
+        
         return jsonify({'status': 'success', 'message': success_message})
     else:
         return jsonify({'status': 'error', 'message': get_message('server_error', lang)}), 500
