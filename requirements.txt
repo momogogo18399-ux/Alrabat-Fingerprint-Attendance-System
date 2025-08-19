@@ -1,33 +1,6 @@
-# PyQt6 for the Desktop GUI
-PyQt6
-
-# Flask for the Web Application
 Flask
-
-# For secure password hashing
-bcrypt
-
-# For handling Excel files (Import/Export/Reports)
-pandas
-openpyxl
-
-# For handling ZKTeco fingerprint devices
-pyzk
-
-# For making HTTP requests (used by web_app to notify the desktop app)
-requests
-
-# Used for PDF report generation (placeholder for future feature)
-reportlab
-
-# QR Code generation and scanning
-qrcode[pil]
-pyzbar
-opencv-python
-
-# Production WSGI server for VPS deployment
 gunicorn
-
-# PostgreSQL client (for DATABASE_URL=postgres://...)
 psycopg2-binary
 python-dotenv
+requests
+bcrypt
