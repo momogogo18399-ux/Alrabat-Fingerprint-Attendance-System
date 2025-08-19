@@ -282,6 +282,23 @@ class MainWindow(QMainWindow):
         exit_action.triggered.connect(self._handle_exit)
         file_menu.addAction(exit_action)
 
+        # إضافة قائمة QR Scanner
+        qr_menu = self.menuBar().addMenu("🔍 QR Scanner")
+        qr_scanner_action = QAction("Scan QR Codes", self)
+        qr_scanner_action.triggered.connect(self._open_qr_scanner)
+        qr_menu.addAction(qr_scanner_action)
+        
+        # إضافة قائمة إعدادات QR
+        qr_settings_action = QAction("⚙️ QR Code Settings", self)
+        qr_settings_action.triggered.connect(self._open_qr_settings)
+        qr_menu.addAction(qr_settings_action)
+        
+        # إضافة قائمة الأدوات المتقدمة
+        advanced_qr_action = QAction("🚀 Advanced QR Tools", self)
+        advanced_qr_action.setToolTip("Professional QR code generation and management tools")
+        advanced_qr_action.triggered.connect(self._open_advanced_qr_tools)
+        qr_menu.addAction(advanced_qr_action)
+
         help_menu = menubar.addMenu(self.tr("Help"))
         about_action = QAction(self.tr("About"), self)
         about_action.triggered.connect(self._show_about)
@@ -367,6 +384,85 @@ class MainWindow(QMainWindow):
     # --- تحديثات التطبيق ---
     def _check_for_updates_clicked(self):
         self.perform_update_check(interactive=True)
+    
+    def _open_qr_scanner(self):
+        """فتح نافذة مسح رموز QR"""
+        try:
+            from app.gui.qr_scanner_dialog import QRScannerDialog
+            dialog = QRScannerDialog(self)
+            dialog.exec()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", 
+                               f"Failed to open QR Scanner:\n{str(e)}")
+    
+    def _open_qr_settings(self):
+        """فتح نافذة إعدادات رموز QR العامة"""
+        try:
+            from app.gui.qr_settings_dialog import QRSettingsDialog
+            dialog = QRSettingsDialog(self)
+            dialog.settings_changed.connect(self._on_qr_settings_changed)
+            dialog.exec()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", 
+                               f"Failed to open QR Settings:\n{str(e)}")
+    
+    def _open_advanced_qr_tools(self):
+        """فتح نافذة الأدوات المتقدمة لرموز QR"""
+        try:
+            from app.gui.advanced_qr_tools import AdvancedQRToolsDialog
+            dialog = AdvancedQRToolsDialog(self)
+            dialog.exec()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", 
+                               f"Failed to open Advanced QR Tools:\n{str(e)}")
+    
+    def _on_qr_settings_changed(self, new_settings):
+        """معالجة تغيير إعدادات QR العامة"""
+        try:
+            # تحديث جميع رموز QR الموجودة
+            from app.utils.qr_manager import QRCodeManager
+            qr_manager = QRCodeManager()
+            qr_manager.update_settings(new_settings)
+            
+            # إعادة إنشاء جميع رموز QR
+            self._regenerate_all_qr_codes(new_settings)
+            
+            QMessageBox.information(self, "Success", 
+                                  "New settings applied to all QR codes successfully!")
+            
+        except Exception as e:
+            QMessageBox.warning(self, "Warning", 
+                              f"Settings updated but failed to regenerate QR codes:\n{str(e)}")
+    
+    def _regenerate_all_qr_codes(self, settings):
+        """إعادة إنشاء جميع رموز QR مع الإعدادات الجديدة"""
+        try:
+            from app.database.database_manager import DatabaseManager
+            db_manager = DatabaseManager()
+            from app.utils.qr_manager import QRCodeManager
+            qr_manager = QRCodeManager()
+            
+            # الحصول على جميع الموظفين
+            employees = db_manager.get_all_employees()
+            
+            success_count = 0
+            for employee in employees:
+                try:
+                    # إنشاء رمز QR جديد مع الإعدادات الجديدة
+                    qr_code = qr_manager.generate_qr_code(employee)
+                    if qr_code:
+                        # حفظ الرمز الجديد
+                        db_manager.update_employee_qr_code(employee['id'], qr_code)
+                        success_count += 1
+                        print(f"✅ QR code updated for employee: {employee.get('name')}")
+                except Exception as e:
+                    print(f"❌ Failed to update QR code for employee {employee.get('name')}: {e}")
+            
+            print(f"Updated {success_count} out of {len(employees)} QR codes")
+            
+        except Exception as e:
+            print(f"Error regenerating QR codes: {e}")
+            raise
 
     def auto_check_updates_on_start(self):
         try:
@@ -414,16 +510,37 @@ class MainWindow(QMainWindow):
     def _download_and_install(self, url: str):
         try:
             self.statusBar().showMessage(self.tr("Downloading update..."))
+            
+            # تحميل الملف
             local_path = download_file(url)
             if not local_path:
                 QMessageBox.critical(self, self.tr("Updates"), self.tr("Failed to download the update."))
                 return
+            
+            # التحقق من صحة الملف
+            from app.utils.update_checker import verify_installer_file
+            if not verify_installer_file(local_path):
+                QMessageBox.critical(self, self.tr("Updates"), self.tr("Downloaded file is invalid or corrupted."))
+                return
+            
+            # تشغيل المثبت
             ok = run_windows_installer(local_path, silent=True)
             if ok:
-                QMessageBox.information(self, self.tr("Updates"), self.tr("Installer started. The application may close or restart during update."))
+                QMessageBox.information(
+                    self, 
+                    self.tr("Updates"), 
+                    self.tr("Installer started successfully. The application may close or restart during update.")
+                )
+                # إغلاق التطبيق بعد التحديث
+                QTimer.singleShot(3000, self.close)
             else:
-                QMessageBox.warning(self, self.tr("Updates"), self.tr("Could not start installer automatically. Please run it manually."))
+                QMessageBox.warning(
+                    self, 
+                    self.tr("Updates"), 
+                    self.tr("Could not start installer automatically. Please run it manually from: ") + local_path
+                )
         except Exception as e:
+            self.logger.error(f"Update installation failed: {e}")
             QMessageBox.critical(self, self.tr("Updates"), f"{self.tr('Update failed')}: {e}")
         finally:
             self.statusBar().clearMessage()

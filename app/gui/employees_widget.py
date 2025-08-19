@@ -1,8 +1,12 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, 
-    QTableWidgetItem, QHeaderView, QMessageBox, QAbstractItemView, QFileDialog
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
+    QHeaderView, QMessageBox, QInputDialog, QLabel, QLineEdit, QComboBox,
+    QGroupBox, QFormLayout, QCheckBox, QSpinBox, QDateEdit, QTextEdit,
+    QSplitter, QFrame, QProgressBar, QDialog, QDialogButtonBox, QAbstractItemView,
+    QFileDialog
 )
-from PyQt6.QtCore import QCoreApplication, QDate, QThread, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QDate, QCoreApplication
+from PyQt6.QtGui import QFont, QColor, QPalette
 import pandas as pd
 import base64
 
@@ -15,8 +19,8 @@ from app.gui.history_dialog import HistoryDialog
 # --- Worker Thread لتسجيل البصمة في الخلفية ---
 class EnrollWorker(QThread):
     success = pyqtSignal(bytes)
-    failure = pyqtSignal(str)
-    step_update = pyqtSignal(str)
+    error = pyqtSignal(str)
+    progress = pyqtSignal(str)
 
     def __init__(self, zk_manager, user_id):
         super().__init__()
@@ -99,19 +103,21 @@ class EmployeesWidget(QWidget):
         self.delete_button.setToolTip(self.tr("Delete the selected employee record"))
         self.history_button = QPushButton(f"📜 {self.tr('View History')}")
         self.history_button.setToolTip(self.tr("View attendance history of the selected employee"))
+        self.qr_button = QPushButton(f"📱 {self.tr('QR Code')}")
+        self.qr_button.setToolTip(self.tr("View QR code for the selected employee"))
         self.refresh_button = QPushButton(f"🔄 {self.tr('Refresh')}")
         self.refresh_button.setToolTip(self.tr("Reload the employee list"))
         
         button_layout.addWidget(self.add_button); button_layout.addSpacing(10)
         button_layout.addWidget(self.import_button); button_layout.addWidget(self.export_template_button); button_layout.addWidget(self.export_data_button); button_layout.addSpacing(10)
         button_layout.addWidget(self.register_fp_button); button_layout.addSpacing(10)
-        button_layout.addWidget(self.edit_button); button_layout.addWidget(self.delete_button); button_layout.addWidget(self.history_button)
+        button_layout.addWidget(self.edit_button); button_layout.addWidget(self.delete_button); button_layout.addWidget(self.history_button); button_layout.addWidget(self.qr_button)
         button_layout.addStretch(); button_layout.addWidget(self.refresh_button)
         layout.addLayout(button_layout)
         
         if self.user_role not in ['Admin', 'HR']:
             self.add_button.setEnabled(False); self.import_button.setEnabled(False); self.export_template_button.setEnabled(False); self.export_data_button.setEnabled(False)
-            self.register_fp_button.setEnabled(False); self.edit_button.setEnabled(False); self.delete_button.setEnabled(False)
+            self.register_fp_button.setEnabled(False); self.edit_button.setEnabled(False); self.delete_button.setEnabled(False); self.qr_button.setEnabled(False)
         
         self.table = QTableWidget(); self.table.setColumnCount(6)
         self.table.setHorizontalHeaderLabels(["ID", self.tr("Code"), self.tr("Full Name"), self.tr("Job Title"), self.tr("Department"), self.tr("Phone Number")])
@@ -124,7 +130,7 @@ class EmployeesWidget(QWidget):
         self.export_template_button.clicked.connect(self.export_template); self.export_data_button.clicked.connect(self.export_all_employees)
         self.register_fp_button.clicked.connect(self.register_fingerprint)
         self.edit_button.clicked.connect(self.edit_employee); self.delete_button.clicked.connect(self.delete_employee)
-        self.history_button.clicked.connect(self.view_employee_history); self.refresh_button.clicked.connect(self.load_employees_data)
+        self.history_button.clicked.connect(self.view_employee_history); self.qr_button.clicked.connect(self.show_qr_code); self.refresh_button.clicked.connect(self.load_employees_data)
         
     def load_employees_data(self):
         employees = self.db_manager.get_all_employees() or []
@@ -197,6 +203,23 @@ class EmployeesWidget(QWidget):
         if dialog.exec():
             data = dialog.get_data();
             if data and self.db_manager.add_employee(data):
+                # إنشاء رمز QR تلقائياً للموظف الجديد
+                try:
+                    from app.utils.qr_manager import QRCodeManager
+                    qr_manager = QRCodeManager()
+                    
+                    # الحصول على بيانات الموظف المحدثة (مع ID)
+                    employee = self.db_manager.get_employee_by_code(data['employee_code'])
+                    if employee:
+                        # إنشاء رمز QR
+                        qr_code = qr_manager.generate_qr_code(employee)
+                        if qr_code:
+                            # حفظ الرمز في قاعدة البيانات
+                            self.db_manager.update_employee_qr_code(employee['id'], qr_code)
+                            print(f"تم إنشاء رمز QR تلقائياً للموظف: {employee['name']}")
+                except Exception as e:
+                    print(f"تحذير: لم يتم إنشاء رمز QR تلقائياً: {e}")
+                
                 QMessageBox.information(self, self.tr("Success"), self.tr("Employee added successfully."))
                 self.load_employees_data()
             elif data:
@@ -236,6 +259,24 @@ class EmployeesWidget(QWidget):
         if not history_data: QMessageBox.information(self, self.tr("No Data"), self.tr("There are no attendance records for this employee.")); return
         dialog = HistoryDialog(employee_name, history_data, self); dialog.exec()
     
+    def show_qr_code(self):
+        """عرض رمز QR للموظف المحدد"""
+        selected_row = self.table.currentRow()
+        if selected_row < 0:
+            QMessageBox.warning(self, self.tr("No Selection"), self.tr("Please select an employee to view their QR code."))
+            return
+        
+        employee_id = int(self.table.item(selected_row, 0).text())
+        employee_data = self.db_manager.get_employee_by_id(employee_id)
+        
+        if not employee_data:
+            QMessageBox.critical(self, self.tr("Error"), self.tr("Employee data not found."))
+            return
+        
+        from app.gui.qr_dialog import QRCodeDialog
+        dialog = QRCodeDialog(employee_data, self)
+        dialog.exec()
+    
     def import_from_excel(self):
         file_path, _ = QFileDialog.getOpenFileName(self, self.tr("Select Excel File"), "", f"{self.tr('Excel Files (*.xlsx *.xls)')}")
         if not file_path: return
@@ -244,13 +285,33 @@ class EmployeesWidget(QWidget):
             if not all(col in df.columns for col in required_columns):
                 QMessageBox.critical(self, self.tr("Import Error"), self.tr("The Excel file must contain 'employee_code', 'name', and 'phone_number' columns.")); return
             success_count, fail_count, failed_records = 0, 0, []
+            
+            # إنشاء مدير QR لإنشاء رموز تلقائياً
+            from app.utils.qr_manager import QRCodeManager
+            qr_manager = QRCodeManager()
+            
             for index, row in df.iterrows():
                 try:
                     data = {'employee_code': str(row['employee_code']),'name': row['name'],'phone_number': str(row['phone_number']),'job_title': row.get('job_title', ''),'department': row.get('department', '')}
                     if not all([data['employee_code'], data['name'], data['phone_number']]):
                         fail_count += 1; failed_records.append(f"{row.get('name', 'N/A')} ({self.tr('missing data')})"); continue
-                    if self.db_manager.add_employee(data): success_count += 1
-                    else: fail_count += 1; failed_records.append(f"{data['name']} ({self.tr('duplicate code or phone')})")
+                    
+                    # إضافة الموظف
+                    if self.db_manager.add_employee(data):
+                        # إنشاء رمز QR تلقائياً
+                        try:
+                            employee = self.db_manager.get_employee_by_code(data['employee_code'])
+                            if employee:
+                                qr_code = qr_manager.generate_qr_code(employee)
+                                if qr_code:
+                                    self.db_manager.update_employee_qr_code(employee['id'], qr_code)
+                                    print(f"تم إنشاء رمز QR تلقائياً للموظف المستورد: {employee['name']}")
+                        except Exception as e:
+                            print(f"تحذير: لم يتم إنشاء رمز QR للموظف المستورد {data['name']}: {e}")
+                        
+                        success_count += 1
+                    else: 
+                        fail_count += 1; failed_records.append(f"{data['name']} ({self.tr('duplicate code or phone')})")
                 except Exception as e: fail_count += 1; failed_records.append(f"{row.get('name', 'N/A')} ({str(e)})")
             self.load_employees_data()
             summary_message = f"{self.tr('Import Complete!')}\n\n✅ {self.tr('Successfully added')}: {success_count}\n❌ {self.tr('Failed to add')}: {fail_count}"

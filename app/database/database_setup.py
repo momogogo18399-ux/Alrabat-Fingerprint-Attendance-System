@@ -33,20 +33,27 @@ def setup_database():
         return
 
     # SQLite path
-    if not os.path.exists(DATABASE_FILE):
-        print("Database not found. Creating a new one for local use...")
-        conn = None
-        try:
-            conn = sqlite3.connect(DATABASE_FILE)
+    conn = None
+    try:
+        is_new = not os.path.exists(DATABASE_FILE)
+        if is_new:
+            print("Database not found. Creating a new one for local use...")
+        conn = sqlite3.connect(DATABASE_FILE)
+        if is_new:
             create_tables(conn)
             create_default_settings(conn)
             create_default_admin(conn)
             print("Local database setup complete.")
-        except sqlite3.Error as e:
-            print(f"Database error during setup: {e}")
-        finally:
-            if conn:
-                conn.close()
+        # Always run lightweight migrations to keep schema up-to-date
+        try:
+            migrate_sqlite_schema(conn)
+        except Exception as e:
+            print(f"SQLite migration warning: {e}")
+    except sqlite3.Error as e:
+        print(f"Database error during setup: {e}")
+    finally:
+        if conn:
+            conn.close()
 
 def create_tables(conn: sqlite3.Connection):
     """
@@ -66,6 +73,7 @@ def create_tables(conn: sqlite3.Connection):
         web_fingerprint TEXT,
         device_token TEXT UNIQUE,
         zk_template TEXT,
+        qr_code TEXT UNIQUE,
         status TEXT DEFAULT 'Active'
     );""")
 
@@ -75,7 +83,7 @@ def create_tables(conn: sqlite3.Connection):
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
         username TEXT NOT NULL UNIQUE, 
         password TEXT NOT NULL, 
-        role TEXT NOT NULL CHECK(role IN ('Viewer', 'Manager', 'HR', 'Admin'))
+        role TEXT NOT NULL CHECK(role IN ('Viewer', 'Manager', 'HR', 'Admin', 'Scanner'))
     );""")
 
     # 3. جدول الحضور (مُعدّل)
@@ -128,6 +136,26 @@ def create_tables(conn: sqlite3.Connection):
     conn.commit()
     print("All tables created successfully.")
 
+    # مهاجرة قيد الدور إذا كان الجدول قديماً لا يحتوي على Scanner
+    try:
+        cur2 = conn.cursor()
+        cur2.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'")
+        row = cur2.fetchone()
+        create_sql = row[0] if row else ''
+        if "Scanner" not in create_sql:
+            # إعادة إنشاء الجدول لتحديث CHECK constraint
+            cur2.execute("PRAGMA foreign_keys=off")
+            cur2.execute("BEGIN TRANSACTION")
+            cur2.execute("CREATE TABLE users_new (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, password TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('Viewer','Manager','HR','Admin','Scanner')))")
+            cur2.execute("INSERT INTO users_new (id, username, password, role) SELECT id, username, password, role FROM users")
+            cur2.execute("DROP TABLE users")
+            cur2.execute("ALTER TABLE users_new RENAME TO users")
+            cur2.execute("COMMIT")
+            cur2.execute("PRAGMA foreign_keys=on")
+            print("[Migration] Updated users.role CHECK to include 'Scanner'.")
+    except Exception as e:
+        print(f"[Migration] users.role check update failed: {e}")
+
 
 
         # 8. جدول الإجازات الرسمية (جدول جديد بالكامل)
@@ -138,7 +166,16 @@ def create_tables(conn: sqlite3.Connection):
         description TEXT NOT NULL
     );""")
 
-    # 9. إنشاء فهارس لتحسين الأداء على الاستعلامات الشائعة
+    # 9. جدول جلسات دخول المشرفين (جديد)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS admin_sessions (
+        token TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    );""")
+
+    # 10. إنشاء فهارس لتحسين الأداء على الاستعلامات الشائعة
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(date)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_attendance_emp_date ON attendance(employee_id, date)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_attendance_type ON attendance(type)")
@@ -148,6 +185,30 @@ def create_tables(conn: sqlite3.Connection):
 
 
 
+
+def migrate_sqlite_schema(conn: sqlite3.Connection):
+    """ترقيات بسيطة للحفاظ على المخطط مواكباً (تشمل إضافة دور Scanner)."""
+    try:
+        cur = conn.cursor()
+        # تحقق من دعم دور Scanner في users
+        cur.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'")
+        row = cur.fetchone()
+        create_sql = row[0] if row else ''
+        if 'CHECK(role IN (\'Viewer\'' not in create_sql:
+            # إذا كان الجدول مختلفاً جداً، نتخطى (حالات نادرة)
+            pass
+        if "Scanner" not in create_sql:
+            cur.execute("PRAGMA foreign_keys=off")
+            cur.execute("BEGIN TRANSACTION")
+            cur.execute("CREATE TABLE users_new (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, password TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('Viewer','Manager','HR','Admin','Scanner')))")
+            cur.execute("INSERT INTO users_new (id, username, password, role) SELECT id, username, password, role FROM users")
+            cur.execute("DROP TABLE users")
+            cur.execute("ALTER TABLE users_new RENAME TO users")
+            cur.execute("COMMIT")
+            cur.execute("PRAGMA foreign_keys=on")
+            print("[Migration] users table updated to include Scanner role.")
+    except Exception as e:
+        print(f"[Migration] Failed to update users table: {e}")
 
 def create_default_settings(conn: sqlite3.Connection):
     """
@@ -199,6 +260,7 @@ def create_tables_postgres(cur):
             web_fingerprint TEXT,
             device_token TEXT UNIQUE,
             zk_template TEXT,
+            qr_code TEXT UNIQUE,
             status TEXT DEFAULT 'Active'
         );
         """
@@ -210,10 +272,17 @@ def create_tables_postgres(cur):
             id SERIAL PRIMARY KEY,
             username TEXT NOT NULL UNIQUE,
             password TEXT NOT NULL,
-            role TEXT NOT NULL CHECK (role IN ('Viewer', 'Manager', 'HR', 'Admin'))
+            role TEXT NOT NULL CHECK (role IN ('Viewer', 'Manager', 'HR', 'Admin', 'Scanner'))
         );
         """
     )
+
+    # ترقية قيد الدور في بوستجرس إذا كان قديماً
+    try:
+        cur.execute("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check")
+        cur.execute("ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('Viewer','Manager','HR','Admin','Scanner'))")
+    except Exception:
+        pass
 
     cur.execute(
         """
@@ -258,6 +327,16 @@ def create_tables_postgres(cur):
         CREATE TABLE IF NOT EXISTS app_settings (
             key TEXT PRIMARY KEY,
             value TEXT
+        );
+        """
+    )
+
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS admin_sessions (
+            token TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
         """
     )

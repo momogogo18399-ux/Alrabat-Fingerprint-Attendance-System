@@ -143,6 +143,23 @@ class DatabaseManager:
         query = "INSERT INTO employees (employee_code, name, job_title, department, phone_number) VALUES (?, ?, ?, ?, ?)"
         params = (data['employee_code'], data['name'], data['job_title'], data['department'], data['phone_number'])
         return self.execute_query(query, params, commit=True)
+    
+    def update_employee_qr_code(self, employee_id, qr_code):
+        """تحديث رمز QR للموظف"""
+        query = "UPDATE employees SET qr_code = ? WHERE id = ?"
+        params = (qr_code, employee_id)
+        return self.execute_query(query, params, commit=True)
+    
+    def get_employee_by_qr_code(self, qr_code):
+        """البحث عن موظف برمز QR"""
+        return self.execute_query("SELECT * FROM employees WHERE qr_code = ?", (qr_code,), fetchone=True)
+    
+    def get_attendance_by_employee_date(self, employee_id, date):
+        """الحصول على تسجيل الحضور لموظف في تاريخ معين"""
+        return self.execute_query(
+            "SELECT * FROM attendance WHERE employee_id = ? AND date = ? ORDER BY check_time DESC LIMIT 1",
+            (employee_id, date), fetchone=True
+        )
 
     def update_employee(self, data):
         query = "UPDATE employees SET employee_code = ?, name = ?, job_title = ?, department = ?, phone_number = ? WHERE id = ?"
@@ -501,6 +518,10 @@ class DatabaseManager:
         params = (data['employee_id'], data['check_time'], data['date'], data['type'], data.get('location_id'), data.get('notes'))
         return self.execute_query(query, params, commit=True)
     
+    def add_attendance(self, data):
+        """دالة مختصرة لإضافة سجل حضور (لتوافق مع QR Scanner)"""
+        return self.add_attendance_record(data)
+    
 
 
     def get_attendance_by_date(self, target_date: str):
@@ -566,6 +587,11 @@ class DatabaseManager:
         return self.execute_query('SELECT id, username, role FROM "users"', fetchall=True)
 
     def add_user(self, username, hashed_password, role):
+        """يضيف مستخدماً جديداً ويعيد المعرف. يرجع None إذا كان الاسم موجوداً بالفعل."""
+        # تحقق مسبق من التكرار لتقديم رسالة أدق
+        existing = self.execute_query('SELECT id FROM "users" WHERE username = ?', (username,), fetchone=True)
+        if existing:
+            return None
         return self.execute_query('INSERT INTO "users" (username, password, role) VALUES (?, ?, ?)', (username, hashed_password, role), commit=True)
 
     def update_user_password(self, user_id, hashed_password):
@@ -584,5 +610,32 @@ class DatabaseManager:
 
     def save_setting(self, key, value):
         self.execute_query("INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)", (key, value), commit=True)
+
+
+    # --- دوال إدارة جلسات المشرفين ---
+    def create_admin_session(self, user_id: int, token: str) -> bool:
+        """إنشاء جلسة مشرف جديدة في قاعدة البيانات."""
+        query = "INSERT INTO admin_sessions (user_id, token) VALUES (?, ?)"
+        # لتجنب التعقيد، سنقوم بحذف الجلسات القديمة للمستخدم قبل إنشاء واحدة جديدة
+        self.execute_query("DELETE FROM admin_sessions WHERE user_id = ?", (user_id,), commit=True)
+        self.execute_query(query, (user_id, token), commit=True)
+        return True
+
+    def validate_admin_session(self, token: str) -> Optional[dict]:
+        """التحقق من صلاحية جلسة المشرف وإرجاع بيانات المستخدم إذا كانت صالحة."""
+        # حذف الجلسات التي مضى عليها أكثر من ساعة واحدة
+        if self.is_postgres:
+            self.execute_query("DELETE FROM admin_sessions WHERE created_at < NOW() - INTERVAL '1 hour'", commit=True)
+        else:
+            # SQLite
+            self.execute_query("DELETE FROM admin_sessions WHERE created_at < DATETIME('now', '-1 hour')", commit=True)
+        
+        query = """
+            SELECT u.id, u.username, u.role 
+            FROM admin_sessions s
+            JOIN users u ON s.user_id = u.id
+            WHERE s.token = ?
+        """
+        return self.execute_query(query, (token,), fetchone=True)
 
 

@@ -27,7 +27,7 @@ class UserDialog(QDialog):
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
 
         self.role_combo = QComboBox()
-        self.role_combo.addItems(['Viewer', 'Manager', 'HR', 'Admin'])
+        self.role_combo.addItems(['Viewer', 'Manager', 'HR', 'Admin', 'Scanner'])
         if self.is_edit_mode:
             self.role_combo.setCurrentText(self.user_data.get('role', 'Viewer'))
 

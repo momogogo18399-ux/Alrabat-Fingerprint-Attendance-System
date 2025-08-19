@@ -19,7 +19,12 @@ requests
 
 # Used for PDF report generation (placeholder for future feature)
 reportlab
- 
+
+# QR Code generation and scanning
+qrcode[pil]
+pyzbar
+opencv-python
+
 # Production WSGI server for VPS deployment
 gunicorn
 

@@ -1,28 +1,52 @@
-Param(
-  [Parameter(Mandatory=$false)][string]$DatabaseUrl = "",
-  [Parameter(Mandatory=$false)][string]$ThemeDir = "assets/themes"
-)
+# PowerShell script to setup Windows development environment for Attendance System
+# Run this script as Administrator
 
-Write-Host "[1/3] Creating virtualenv and installing requirements..."
-python -m venv .venv
-& .\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip setuptools wheel
-python -m pip install -r requirements.txt
+Write-Host "Setting up Windows development environment..." -ForegroundColor Green
 
-if ($DatabaseUrl -ne "") {
-  $env:DATABASE_URL = $DatabaseUrl
+# Check if running as Administrator
+if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+    Write-Host "This script requires Administrator privileges. Please run as Administrator." -ForegroundColor Red
+    exit 1
 }
-$env:THEME_DIR = $ThemeDir
 
-Write-Host "[2/3] Checking PostgreSQL client (optional)..."
-python - << 'PY'
-try:
-    import psycopg2
-    print('psycopg2 OK')
-except Exception as e:
-    print('psycopg2 not available (install if using PostgreSQL):', e)
-PY
+# Install Chocolatey if not present
+if (!(Get-Command choco -ErrorAction SilentlyContinue)) {
+    Write-Host "Installing Chocolatey..." -ForegroundColor Yellow
+    Set-ExecutionPolicy Bypass -Scope Process -Force
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+    iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+}
 
-Write-Host "[3/3] Launching desktop app..."
-python -m app.main
+# Install required software
+Write-Host "Installing required software..." -ForegroundColor Yellow
+
+# Python 3.10+
+choco install python311 -y
+
+# Git
+choco install git -y
+
+# Inno Setup 6
+choco install innosetup -y
+
+# Visual Studio Build Tools (for some Python packages)
+choco install visualstudio2022buildtools -y
+
+# Refresh environment variables
+$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+
+Write-Host "Software installation completed!" -ForegroundColor Green
+
+# Create .env file from template
+if (Test-Path "env.example") {
+    Write-Host "Creating .env file from template..." -ForegroundColor Yellow
+    Copy-Item "env.example" ".env"
+    Write-Host "Please edit .env file with your specific settings" -ForegroundColor Cyan
+}
+
+Write-Host "Setup completed successfully!" -ForegroundColor Green
+Write-Host "Next steps:" -ForegroundColor Cyan
+Write-Host "1. Edit .env file with your settings" -ForegroundColor White
+Write-Host "2. Run: pip install -r requirements.txt" -ForegroundColor White
+Write-Host "3. Run: python deploy/build_all.py --create-env" -ForegroundColor White
 

@@ -1,3 +1,4 @@
+# type: ignore
 import argparse
 import os
 import re
@@ -6,7 +7,29 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from dotenv import load_dotenv
+
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    def load_dotenv(*args, **kwargs):
+        """Fallback function when python-dotenv is not available"""
+        pass
+
+
+def safe_import_pyinstaller():
+    """Safely import PyInstaller and return version info"""
+    try:
+        import importlib.util
+        spec = importlib.util.find_spec("PyInstaller")
+        if spec is not None:
+            PyInstaller = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(PyInstaller)
+            version = getattr(PyInstaller, '__version__', 'unknown')
+            return True, version
+        else:
+            return False, None
+    except Exception:
+        return False, None
 
 
 def print_step(message: str) -> None:
@@ -158,21 +181,82 @@ def build_exe(venv_python: Path, project_root: Path) -> Path:
 	return out
 
 
-def build_installer(project_root: Path, app_version: str) -> Path:
-	print_step("Build installer with Inno Setup")
-	iscc = find_iscc_exe()
-	if not iscc:
-		raise RuntimeError("ISCC.exe (Inno Setup 6) not found. Please install Inno Setup 6.")
-	iss_dir = project_root / "deploy"
-	iss = iss_dir / "installer.iss"
-	# Run ISCC from the script directory so OutputDir relative paths work as expected
-	run_cmd([str(iscc), f"/DMyAppVersion={app_version}", iss.name], cwd=iss_dir)
-	out = iss_dir / "output" / "AttendanceAdminInstaller.exe"
-	if not out.exists():
-		raise RuntimeError("Installer not found in deploy/output. Check Inno logs.")
-	print(f"[✓] Installer: {out}")
-	return out
-
+def build_installer(project_root: Path, version: str) -> Path | None:
+	"""بناء المثبتات باستخدام PyInstaller و Inno Setup"""
+	print_step("Building installer with PyInstaller and Inno Setup")
+	
+	# التحقق من المتطلبات الأساسية
+	required_files = [
+		project_root / "requirements.txt",
+		project_root / "app" / "main.py",
+		project_root / "deploy" / "installer.iss"
+	]
+	
+	for file_path in required_files:
+		if not file_path.exists():
+			print(f"❌ Required file not found: {file_path}")
+			return None
+	
+	# البحث عن ISCC.exe
+	iscc_exe = find_iscc_exe()
+	if not iscc_exe:
+		print("❌ ISCC.exe not found. Please install Inno Setup 6")
+		print("   Download from: https://jrsoftware.org/isdl.php")
+		return None
+	
+	# إنشاء مجلد الإخراج
+	output_dir = project_root / "deploy" / "deploy" / "output"
+	output_dir.mkdir(parents=True, exist_ok=True)
+	
+	# التحقق من وجود PyInstaller
+	pyinstaller_available, pyinstaller_version = safe_import_pyinstaller()
+	if pyinstaller_available:
+		print_step(f"PyInstaller version: {pyinstaller_version}")
+	else:
+		print("❌ PyInstaller not installed. Installing...")
+		try:
+			subprocess.run([sys.executable, "-m", "pip", "install", "pyinstaller==6.15.0"], check=True)
+			# Try to get version after installation
+			pyinstaller_available, pyinstaller_version = safe_import_pyinstaller()
+			if pyinstaller_available:
+				print_step(f"PyInstaller installed successfully, version: {pyinstaller_version}")
+			else:
+				print("⚠️  PyInstaller installed but version could not be determined")
+		except subprocess.CalledProcessError:
+			print("❌ Failed to install PyInstaller")
+			return None
+	
+	# تحديث ملف Inno Setup
+	iss_file = project_root / "deploy" / "installer.iss"
+	if iss_file.exists():
+		iss_content = iss_file.read_text(encoding="utf-8")
+		iss_content = iss_content.replace('{#VERSION}', version)
+		iss_file.write_text(iss_content, encoding="utf-8")
+		print_step("Updated installer.iss with version")
+	
+	# بناء المثبت
+	try:
+		print_step("Running Inno Setup compiler...")
+		run_cmd([str(iscc_exe), str(iss_file)], cwd=project_root / "deploy")
+		print_step("Inno Setup build completed successfully")
+	except subprocess.CalledProcessError as e:
+		print(f"❌ Inno Setup build failed: {e}")
+		print("   Check the installer.iss file and Inno Setup installation")
+		return None
+	except Exception as e:
+		print(f"❌ Unexpected error during build: {e}")
+		return None
+	
+	# التحقق من وجود الملفات المطلوبة
+	installer_path = output_dir / f"AttendanceAdminInstaller.exe"
+	if installer_path.exists():
+		size_mb = installer_path.stat().st_size / (1024 * 1024)
+		print_step(f"Installer created successfully: {installer_path.name} ({size_mb:.1f} MB)")
+		return installer_path
+	else:
+		print("❌ Installer file not found after build")
+		print("   Check Inno Setup logs for errors")
+		return None
 
 
 def upload_release_assets(repo: str, tag: str, release_name: str, release_body: str, asset_paths: list[Path], github_token: str) -> None:
@@ -274,6 +358,61 @@ def upload_release_assets(repo: str, tag: str, release_name: str, release_body: 
 		upload_asset(release_id, asset)
 
 
+def _create_env_template(project_root: Path, args: argparse.Namespace) -> None:
+	"""إنشاء ملف .env.example مع الإعدادات المطلوبة"""
+	env_template = project_root / ".env.example"
+	
+	# تحديد GitHub repo من المعاملات أو git
+	github_repo = getattr(args, 'github_repo', None)
+	if not github_repo:
+		github_repo = _detect_repo_from_git(project_root)
+	
+	github_owner = None
+	if github_repo:
+		parts = github_repo.split('/')
+		if len(parts) == 2:
+			github_owner, github_repo = parts
+	
+	env_content = f"""# Flask Settings
+FLASK_DEBUG=0
+FLASK_ENV=production
+
+# Database Settings
+# DATABASE_URL=postgresql://attendance:strongpass@127.0.0.1:5432/attendance
+SQLITE_FILE=attendance.db
+
+# Update Server Settings
+UPDATE_SERVER_URL=https://your-domain.com
+FALLBACK_SERVER_URL=http://localhost:5000
+UPDATE_TIMEOUT=10.0
+DOWNLOAD_TIMEOUT=60.0
+UPDATE_MAX_RETRIES=3
+
+# GitHub Settings (for updates)
+GITHUB_OWNER={github_owner or 'your-username'}
+GITHUB_REPO={github_repo or 'your-repo-name'}
+
+# Public URLs
+PUBLIC_BASE_URL=https://your-domain.com
+
+# Update Configuration
+UPDATE_NOTES=- تحسينات عامة وإصلاحات أخطاء.\\n- دعم التحقق التلقائي من التحديثات.\\n- تحسينات في الأداء والاستقرار.
+MANDATORY_UPDATE=false
+MIN_SUPPORTED_VERSION=1.0.0
+
+# Desktop App Settings
+THEME_DIR=assets/themes
+NOTIFIER_HOST=localhost
+NOTIFIER_PORT=8989
+
+# Security Settings
+SECRET_KEY=your-secret-key-here
+"""
+	
+	env_template.write_text(env_content, encoding="utf-8")
+	print_step(f"Created .env.example template")
+
+
 class SubstDrive:
 	def __init__(self, target: Path, letter: str = "X"):
 		self.target = target
@@ -298,63 +437,86 @@ class SubstDrive:
 			subprocess.run(["subst", f"{self.letter}:", "/D"], check=False)
 
 
+def upload_to_github(project_root: Path, version: str, github_token: str, args: argparse.Namespace) -> None:
+	"""رفع المثبتات إلى GitHub Releases"""
+	repo = getattr(args, 'github_repo', None) or _detect_repo_from_git(project_root)
+	if not repo:
+		print("❌ No GitHub repository specified. Use --github-repo or ensure git remote is set")
+		return
+	
+	print_step(f"Uploading to GitHub repository: {repo}")
+	
+	# البحث عن الملفات المطلوبة
+	installer_path = project_root / "deploy" / "deploy" / "output" / f"AttendanceAdminInstaller.exe"
+	exe_path = project_root / "deploy" / "deploy" / "output" / f"FingerprintAttendanceSystem.exe"
+	
+	assets = []
+	if installer_path.exists():
+		assets.append(installer_path)
+	if exe_path.exists():
+		assets.append(exe_path)
+	
+	if not assets:
+		print("❌ No installer files found. Run build first.")
+		return
+	
+	# إنشاء أو تحديث الإصدار
+	tag = f"v{version}"
+	release_name = f"Attendance Admin {version}"
+	release_body = f"""## ما الجديد في الإصدار {version}
+
+- تحسينات عامة وإصلاحات أخطاء
+- دعم التحقق التلقائي من التحديثات
+- تحسينات في الأداء والاستقرار
+- دعم قاعدة البيانات المشتركة
+- تحسينات في الأمان
+
+### التثبيت
+1. قم بتحميل `AttendanceAdminInstaller.exe`
+2. شغل الملف كمسؤول
+3. اتبع خطوات التثبيت
+
+### التحديث التلقائي
+سيتم التحقق من التحديثات تلقائيًا عند تشغيل البرنامج.
+"""
+	
+	upload_release_assets(repo, tag, release_name, release_body, assets, github_token)
+	print_step("GitHub upload completed successfully")
+
+
 def main() -> None:
-	parser = argparse.ArgumentParser(description="Build EXE and Inno Setup installer (Windows)")
-	parser.add_argument("--version", help="Override app version (defaults to app/version.py)")
-	parser.add_argument("--use-subst", action="store_true", help="Use temporary SUBST drive for long paths (auto-enabled when needed)")
-	# GitHub release options (manual mode only)
-	parser.add_argument("--upload-release", action="store_true", help="Upload EXE/installer to GitHub release (manual mode)")
-	parser.add_argument("--repo", help="GitHub repository in owner/repo format (auto-detected from git remote or GITHUB_REPOSITORY)")
-	parser.add_argument("--tag", help="Release tag (defaults to v<version>)")
-	parser.add_argument("--release-name", help="Release name (defaults to Attendance Admin <version>)")
-	parser.add_argument("--release-body", help="Release body/notes")
-	parser.add_argument("--token", help="GitHub token (overrides env/file)")
-	parser.add_argument("--save-token", action="store_true", help="Persist provided token to deploy/github_token.txt")
+	parser = argparse.ArgumentParser(description="Build and deploy attendance system")
+	parser.add_argument("--token", help="GitHub token for releases")
+	parser.add_argument("--github-repo", help="GitHub repository (owner/repo)")
+	parser.add_argument("--skip-build", action="store_true", help="Skip building installer")
+	parser.add_argument("--skip-upload", action="store_true", help="Skip uploading to GitHub")
+	parser.add_argument("--create-env", action="store_true", help="Create .env.example template")
+	
 	args = parser.parse_args()
-
-	project_root = Path(__file__).resolve().parents[1]
-	app_version = args.version or read_app_version(project_root)
-	print_step(f"Project root: {project_root}")
-	print_step(f"App version: {app_version}")
-
-	use_subst = args.use_subst or (os.name == "nt" and len(str(project_root)) > 150)
-	if use_subst and os.name == "nt":
-		with SubstDrive(project_root, "X") as mapped_root:
-			run_all(Path(mapped_root), app_version, args)
-	else:
-		run_all(project_root, app_version, args)
-
-
-def run_all(root: Path, app_version: str, args: argparse.Namespace) -> None:
-	venv_dir = root / ".buildvenv"
-	venv_python = ensure_venv(root, venv_dir)
-	install_deps(venv_python, root)
-	exe_path = build_exe(venv_python, root)
-	installer_path = build_installer(root, app_version)
-	# Manual GitHub release upload only (requires --upload-release flag)
-	repo = (
-		args.repo
-		or os.environ.get("GITHUB_REPOSITORY")
-		or _detect_repo_from_git(root)
-	)
-	github_token = _get_github_token(root, args)
-	if args.save_token and args.token:
-		_save_github_token(root, args.token)
-	# Manual GitHub release upload only (requires --upload-release flag)
-	if getattr(args, "upload_release", False):
-		if not repo:
-			raise SystemExit("--repo is required when using --upload-release")
+	project_root = Path(__file__).parent.parent
+	
+	print_step("Starting build process")
+	
+	# إنشاء ملف .env.example إذا طُلب
+	if args.create_env:
+		_create_env_template(project_root, args)
+		return
+	
+	version = read_app_version(project_root)
+	print_step(f"Building version {version}")
+	
+	if not args.skip_build:
+		build_installer(project_root, version)
+	
+	if not args.skip_upload:
+		github_token = _get_github_token(project_root, args)
 		if not github_token:
-			raise SystemExit("GITHUB_TOKEN environment variable or --token is required for --upload-release")
-		tag = args.tag or f"v{app_version}"
-		release_name = args.release_name or f"Attendance Admin {app_version}"
-		release_body = args.release_body or "Automated release"
-		assets = [exe_path, installer_path]
-		print_step(f"Upload release assets to GitHub: {repo} tag={tag}")
-		upload_release_assets(repo, tag, release_name, release_body, assets, github_token)
-	else:
-		print_step("GitHub release upload skipped (use --upload-release to enable).")
-	print("\nAll done.")
+			print("❌ No GitHub token found. Set GITHUB_TOKEN env var or use --token")
+			return
+		
+		upload_to_github(project_root, version, github_token, args)
+	
+	print_step("Build process completed")
 
 
 if __name__ == "__main__":
