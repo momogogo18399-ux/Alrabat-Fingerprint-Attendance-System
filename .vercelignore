@@ -1,0 +1,23 @@
+# Ignore all files related to the desktop application
+app/gui/
+app/fingerprint/
+assets/
+deploy/
+installer/
+releases/
+locales/
+translations/
+
+# Ignore other non-essential files for the web build
+*.db
+*.spec
+*.ps1
+*.iss
+README.md
+README_AR.md
+*.json
+!vercel.json
+!qr_settings.json
+
+# Ignore the original requirements file
+requirements.txt
