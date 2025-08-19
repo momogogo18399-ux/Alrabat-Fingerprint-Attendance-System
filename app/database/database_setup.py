@@ -1,21 +1,53 @@
 import os
 import sqlite3
+import asyncio
 from typing import Optional
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # هذا الاستيراد مهم لإنشاء المستخدم المدير الافتراضي
 from app.utils.encryption import hash_password
 
-DATABASE_FILE = "attendance.db"
+# Database configuration
+DATABASE_FILE = os.getenv("SQLITE_FILE", "attendance.db")
 DATABASE_URL = os.getenv("DATABASE_URL")
 IS_POSTGRES = bool(DATABASE_URL and DATABASE_URL.startswith("postgres"))
+IS_SUPABASE = bool(os.getenv("SUPABASE_URL"))
 
+# Import database drivers with fallbacks
 try:
     import psycopg2
-except Exception:
+    from psycopg2.extras import RealDictCursor
+except ImportError:
     psycopg2 = None
 
-def setup_database():
-    """تهيئة قاعدة البيانات. تستخدم PostgreSQL إذا تم ضبط DATABASE_URL، وإلا SQLite."""
+try:
+    from supabase import create_client
+except ImportError:
+    create_client = None
+
+async def setup_database():
+    """
+    Initialize the database. Uses Supabase if configured, otherwise PostgreSQL or SQLite.
+    """
+    # Check for Supabase configuration first
+    if IS_SUPABASE:
+        print("Supabase configuration detected. Initializing Supabase...")
+        try:
+            from .supabase_migrations import run_supabase_migrations
+            success = await run_supabase_migrations()
+            if success:
+                print("Supabase initialization completed successfully.")
+                return
+            else:
+                print("Warning: Supabase initialization had issues. Falling back to local database.")
+        except Exception as e:
+            print(f"Error initializing Supabase: {e}")
+            print("Falling back to local database configuration...")
+    
+    # Fall back to PostgreSQL if configured
     if IS_POSTGRES:
         if psycopg2 is None:
             print("psycopg2 not installed; cannot set up PostgreSQL schema.")
@@ -32,28 +64,33 @@ def setup_database():
             print(f"PostgreSQL setup error: {e}")
         return
 
-    # SQLite path
+    # SQLite path (fallback)
     conn = None
     try:
         is_new = not os.path.exists(DATABASE_FILE)
         if is_new:
-            print("Database not found. Creating a new one for local use...")
+            print("Database not found. Creating a new SQLite database for local use...")
         conn = sqlite3.connect(DATABASE_FILE)
         if is_new:
             create_tables(conn)
             create_default_settings(conn)
             create_default_admin(conn)
-            print("Local database setup complete.")
+            print("Local SQLite database setup complete.")
         # Always run lightweight migrations to keep schema up-to-date
         try:
             migrate_sqlite_schema(conn)
         except Exception as e:
             print(f"SQLite migration warning: {e}")
     except sqlite3.Error as e:
-        print(f"Database error during setup: {e}")
+        print(f"SQLite database error during setup: {e}")
     finally:
         if conn:
             conn.close()
+
+# Add a synchronous wrapper for backward compatibility
+def setup_database_sync():
+    """Synchronous wrapper for the async setup_database function."""
+    return asyncio.run(setup_database())
 
 def create_tables(conn: sqlite3.Connection):
     """

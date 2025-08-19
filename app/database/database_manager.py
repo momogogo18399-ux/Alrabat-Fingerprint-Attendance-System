@@ -22,6 +22,7 @@ class DatabaseManager:
         self.database_url: Optional[str] = os.getenv("DATABASE_URL")
         self.is_postgres: bool = bool(self.database_url and self.database_url.startswith("postgres"))
         self.db_file = db_file
+        print(f"[DB Manager] Using DATABASE_URL: {self.database_url}")
         if self.is_postgres:
             print("[DB Manager] Initialized for PostgreSQL via DATABASE_URL")
         else:
@@ -33,8 +34,10 @@ class DatabaseManager:
             if psycopg2 is None:
                 print("psycopg2 not installed. Cannot connect to PostgreSQL.")
                 return None
+            print(f"[DB Manager] Attempting PostgreSQL connection...")
             try:
                 conn = psycopg2.connect(self.database_url)
+                print("[DB Manager] PostgreSQL connection successful.")
                 return conn
             except Exception as e:
                 print(f"PostgreSQL connection error: {e}")

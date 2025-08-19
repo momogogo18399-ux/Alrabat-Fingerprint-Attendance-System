@@ -1,5 +1,35 @@
 # نظام الحضور والانصراف - Web-Based Employee Attendance System
 
+## 🚀 Supabase Integration
+
+This project supports Supabase as a backend service. Follow these steps to set it up:
+
+1. **Create a Supabase Project**:
+   - Go to [Supabase](https://supabase.com/) and create a new project
+   - Wait for your database to be provisioned
+
+2. **Configure Environment Variables**:
+   - Copy `.env.example` to `.env`
+   - Update the following variables with your Supabase credentials:
+     ```
+     SUPABASE_URL=your-project-url
+     SUPABASE_KEY=your-anon-key
+     SUPABASE_SERVICE_KEY=your-service-role-key
+     ```
+   - You can find these values in your Supabase project settings > API
+
+3. **Database Setup**:
+   - The application will automatically create the necessary tables if they don't exist
+   - You can also run the database migrations manually:
+     ```bash
+     python -m app.database.database_setup
+     ```
+
+4. **Enable Row Level Security (RLS)**:
+   - In your Supabase dashboard, go to Authentication > Policies
+   - Enable RLS on all tables that require it
+   - Create appropriate policies for your application's access control needs
+
 ## 🌟 وصف المشروع
 
 نظام شامل ومتطور لإدارة الحضور والانصراف مصمم ليكون مرنًا وآمنًا وسهل الاستخدام. يجمع النظام بين واجهة **ويب** للموظفين للتسجيل من أي مكان باستخدام هواتفهم، ولوحة تحكم **سطح المكتب** قوية للمديرين مبنية بـ Python و PyQt6.

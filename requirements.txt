@@ -4,3 +4,8 @@ psycopg2-binary
 python-dotenv
 requests
 bcrypt
+supabase
+python-jose[cryptography]  # For JWT handling
+gotrue  # For Supabase Auth
+postgrest  # For Supabase realtime
+realtime  # For Supabase realtime
