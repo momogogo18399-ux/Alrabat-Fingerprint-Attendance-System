@@ -16,7 +16,7 @@ import io
 
 class AdvancedQRToolsDialog(QDialog):
     """
-    نافذة أدوات QR متقدمة مع ميزات احترافية
+    Advanced QR tools window with professional features
     """
     
     def __init__(self, parent=None):
@@ -170,7 +170,7 @@ class AdvancedQRToolsDialog(QDialog):
         
         right_layout.addStretch()
         
-        # إضافة اللوحات
+        # Add اللوحات
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(left_panel)
         splitter.addWidget(right_panel)
@@ -388,7 +388,7 @@ class AdvancedQRToolsDialog(QDialog):
         self.content_text_edit.setPlaceholderText(placeholder_map.get(content_type, "Enter content..."))
     
     def on_logo_checkbox_changed(self, checked):
-        """معالجة تغيير حالة إضافة اللوجو"""
+        """معالجة تغيير حالة Add اللوجو"""
         self.logo_path_edit.setEnabled(checked)
         self.logo_browse_button.setEnabled(checked)
     
@@ -458,7 +458,7 @@ class AdvancedQRToolsDialog(QDialog):
             
             img = qr.make_image(fill_color=foreground_color, back_color=background_color)
             
-            # إضافة اللوجو إذا كان مفعلاً
+            # Add اللوجو إذا كان Enabledاً
             if self.add_logo_checkbox.isChecked() and self.logo_path_edit.text():
                 try:
                     logo_path = self.logo_path_edit.text()
@@ -489,7 +489,7 @@ class AdvancedQRToolsDialog(QDialog):
             self.preview_label.setPixmap(pixmap)
             self.save_button.setEnabled(True)
             
-            # حفظ الصورة مؤقتاً
+            # Save الصورة مؤقتاً
             self.current_qr_image = img
             self.current_qr_content = content
             
@@ -499,7 +499,7 @@ class AdvancedQRToolsDialog(QDialog):
             QMessageBox.critical(self, "Error", f"Failed to generate QR code:\n{str(e)}")
     
     def save_advanced_qr(self):
-        """حفظ رمز QR المتقدم"""
+        """Save رمز QR المتقدم"""
         try:
             if not hasattr(self, 'current_qr_image'):
                 QMessageBox.warning(self, "Warning", "Please generate a QR code first.")
@@ -534,7 +534,7 @@ class AdvancedQRToolsDialog(QDialog):
             # قراءة ملف Excel
             df = pd.read_excel(excel_path)
             
-            # تحديث قوائم الأعمدة
+            # Update قوائم الأعمدة
             columns = df.columns.tolist()
             self.content_column_combo.clear()
             self.content_column_combo.addItems(columns)
@@ -557,7 +557,7 @@ class AdvancedQRToolsDialog(QDialog):
             self.name_column_combo.setEnabled(True)
             self.generate_bulk_button.setEnabled(True)
             
-            # حفظ البيانات
+            # Save البيانات
             self.excel_data = df
             
             QMessageBox.information(self, "Success", f"Excel file loaded successfully!\nRows: {len(df)}")
@@ -616,7 +616,7 @@ class AdvancedQRToolsDialog(QDialog):
                         back_color=getattr(self, 'background_color', '#FFFFFF')
                     )
                     
-                    # حفظ الصورة
+                    # Save الصورة
                     filename = f"qr_{name}_{index}.png"
                     filepath = os.path.join(export_dir, filename)
                     img.save(filepath, 'PNG')
@@ -627,7 +627,7 @@ class AdvancedQRToolsDialog(QDialog):
                     error_count += 1
                     print(f"Error generating QR for row {index}: {e}")
                 
-                # تحديث شريط التقدم
+                # Update شريط التقدم
                 self.progress_bar.setValue(index + 1)
                 QCoreApplication.processEvents()
             
@@ -675,7 +675,7 @@ class AdvancedQRToolsDialog(QDialog):
                 QMessageBox.warning(self, "Warning", "Please select a valid image file.")
                 return
             
-            # هنا يمكن إضافة كود مسح QR باستخدام مكتبة pyzbar
+            # هنا يمكن Add كود مسح QR باستخدام مكتبة pyzbar
             # للتبسيط، سنعرض رسالة نجاح
             self.results_text.setText("QR Code scanned successfully!\n\nContent: Sample QR Code Content\nType: Text\nSize: 300x300")
             self.copy_button.setEnabled(True)
@@ -697,7 +697,7 @@ class AdvancedQRToolsDialog(QDialog):
             QMessageBox.critical(self, "Error", f"Failed to copy results:\n{str(e)}")
     
     def save_advanced_settings(self):
-        """حفظ الإعدادات المتقدمة"""
+        """Save الإعدادات المتقدمة"""
         try:
             settings = {
                 'error_correction': self.error_correction_combo.currentText(),
@@ -708,7 +708,7 @@ class AdvancedQRToolsDialog(QDialog):
                 'quality': self.quality_slider.value()
             }
             
-            # حفظ الإعدادات
+            # Save الإعدادات
             with open('advanced_qr_settings.json', 'w', encoding='utf-8') as f:
                 json.dump(settings, f, ensure_ascii=False, indent=2)
             

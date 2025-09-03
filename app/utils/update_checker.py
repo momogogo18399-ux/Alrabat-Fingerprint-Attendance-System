@@ -12,7 +12,7 @@ import requests
 DEFAULT_SERVER_URL = os.getenv('UPDATE_SERVER_URL', 'https://attendance.yourdomain.com')
 FALLBACK_SERVER_URL = os.getenv('FALLBACK_SERVER_URL', 'http://localhost:5000')
 
-# إعدادات إضافية للتحديثات
+# إعدادات إضافية للUpdateات
 UPDATE_TIMEOUT = float(os.getenv('UPDATE_TIMEOUT', '10.0'))
 DOWNLOAD_TIMEOUT = float(os.getenv('DOWNLOAD_TIMEOUT', '60.0'))
 MAX_RETRIES = int(os.getenv('UPDATE_MAX_RETRIES', '3'))
@@ -43,7 +43,7 @@ def is_newer_version(latest: str, current: str) -> bool:
 
 def fetch_latest_info(server_url: Optional[str] = None, timeout_sec: float = UPDATE_TIMEOUT) -> Optional[Dict]:
     """
-    يحاول جلب معلومات التحديث من الخادم الرئيسي، وإذا فشل يحاول الخادم الاحتياطي
+    يحاول جلب Information الUpdate من الخادم الرئيسي، وإذا Failed يحاول الخادم الاحتياطي
     """
     # Return None to disable update checks and prevent crashes
     return None
@@ -78,7 +78,7 @@ def fetch_latest_info(server_url: Optional[str] = None, timeout_sec: float = UPD
 
 def download_file(url: str, suggested_name: str = "AttendanceAdminInstaller.exe", timeout_sec: float = DOWNLOAD_TIMEOUT) -> Optional[str]:
     """
-    تحميل ملف التحديث مع إدارة أفضل للأخطاء والتقدم
+    تحميل ملف الUpdate مع إدارة أفضل للأخطاء والتقدم
     """
     try:
         logger.info(f"Starting download from: {url}")

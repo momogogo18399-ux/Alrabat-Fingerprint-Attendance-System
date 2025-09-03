@@ -27,13 +27,13 @@ def get_config():
             'port': '4370',
             'password': '0'
         }
-        save_config(config) # حفظ الملف بالقيم الافتراضية
+        save_config(config) # Save الملف بالقيم الافتراضية
         
     return config
 
 def save_config(config):
     """
-    يحفظ كائن الإعدادات في ملف config.ini.
+    يSave كائن الإعدادات في ملف config.ini.
     """
     try:
         with open(CONFIG_FILE, 'w', encoding='utf-8') as configfile:

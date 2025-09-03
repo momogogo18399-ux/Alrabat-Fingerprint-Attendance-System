@@ -1,20 +1,106 @@
-.venv/
-venv/
-.venv_old/
+# Python
 __pycache__/
-dist/
+*.py[cod]
+*$py.class
+*.so
+.Python
 build/
-deploy/output/
-.env
-attendance.db
-logs/
-.venv_old/
-.venv/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
 venv/
-__pycache__/
-dist/
-build/
-deploy/output/
-.env
-attendance.db
-logs/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Logs
+logs/*.log
+logs/*.log.*
+*.log
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+local_*.db
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+*.temp
+
+# Exports
+exports/
+*.xlsx
+*.csv
+*.json
+data_export_*.json
+
+# AI Data
+ai_data/
+ai_config.json
+
+# Test files
+test_*.py
+*_test.py
+*test.py
+minimal_test.py
+basic_test.py
+simple_test.py
+detailed_test.py
+corrected_test.py
+debug_*.py
+
+# Backup files
+*backup*
+*.bak
+*.backup
+
+# Environment variables
+
+.env.local
+.env.production
+
+# Build artifacts
+installer/
+releases/
+*.exe
+*.msi
+*.deb
+*.rpm
+
+# Documentation (keep only main README)
+# docs/ folder is now organized and should be tracked

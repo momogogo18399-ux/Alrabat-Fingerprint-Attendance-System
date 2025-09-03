@@ -717,7 +717,7 @@
         async function fetchEmployeeStatus() {
             clearMessage();
             const identifier = identifierInput.value.trim();
-            if (identifier.length < 4) { updateDashboard(null, 'initial'); return; }
+            if (identifier.length < 4) { updateDashboard(null, 'initial'); return false; }
             try {
                 const response = await fetch(`/api/employee-status?identifier=${identifier}`, {
                     headers: {
@@ -728,19 +728,23 @@
                     const result = await response.json().catch(() => null);
                     if (response.status === 404) {
                         updateDashboard(null, 'not_found');
+                        return false;
                     } else if (result && result.message) {
                         showMessage(result.message, 'error');
                         updateDashboard(null, 'initial'); // Hide dashboard if there's a specific error
+                        return false;
                     } else {
                         throw new Error('Server returned an unhandled error');
                     }
                 } else {
                     const result = await response.json();
                     updateDashboard(result, result.status || 'found');
+                    return true;
                 }
             } catch (error) {
                 console.error("Error fetching status:", error);
                 updateDashboard(null, 'error');
+                return false;
             }
         }
     
@@ -1038,8 +1042,14 @@
                     identifierInput.value = String(code.data).trim();
                     qrStatus.textContent = `${translations[currentLang]['qr-status-success']} ${identifierInput.value}`;
                     stopQrScanner();
-                    // Fetch employee then start fingerprint automatically
-                    fetchEmployeeStatus().then(() => startFingerprintScan());
+                    // Fetch employee first, then start fingerprint only if employee found
+                    fetchEmployeeStatus().then((success) => {
+                        if (success) {
+                            startFingerprintScan();
+                        } else {
+                            showMessage(translations[currentLang]['employee-not-found'], 'error');
+                        }
+                    });
                 }
             }
             requestAnimationFrame(tickQrScan);

@@ -1,7 +1,9 @@
 import os
 import sqlite3
-import datetime
-from typing import Any, List, Optional
+import logging
+from datetime import datetime
+import hashlib
+from typing import Any, List, Optional, Dict
 
 try:
     import psycopg2
@@ -14,122 +16,308 @@ DATABASE_FILE = os.getenv("SQLITE_FILE", "attendance.db")
 
 class DatabaseManager:
     """
-    طبقة وصول قاعدة البيانات بدعم مزدوج: SQLite (افتراضي) أو PostgreSQL عبر متغير البيئة DATABASE_URL.
-    توحد أسلوب الاستعلامات وتعيد قواميس.
+    Database access layer with dual support: SQLite (default) or PostgreSQL via DATABASE_URL environment variable.
+    Unifies query style and returns dictionaries.
     """
 
-    def __init__(self, db_file: str = DATABASE_FILE):
-        self.database_url: Optional[str] = os.getenv("DATABASE_URL")
-        self.is_postgres: bool = bool(self.database_url and self.database_url.startswith("postgres"))
-        self.db_file = db_file
-        print(f"[DB Manager] Using DATABASE_URL: {self.database_url}")
-        if self.is_postgres:
-            print("[DB Manager] Initialized for PostgreSQL via DATABASE_URL")
+    def __init__(self):
+        # Database settings
+        self.database_url: Optional[str] = None  # Disable DATABASE_URL
+        
+        # Force local system usage
+        force_local = os.getenv('FORCE_LOCAL_DATABASE', 'true').lower() == 'true'
+        use_sqlite_only = os.getenv('USE_SQLITE_ONLY', 'true').lower() == 'true'
+        
+        if force_local or use_sqlite_only:
+            self.database_url = None
+            print("[DB Manager] Forced to use LOCAL SQLite database")
         else:
-            print(f"[DB Manager] Initialized for local SQLite database: {self.db_file}")
+            self.database_url = os.getenv("DATABASE_URL")
+        
+        self.sqlite_file = os.getenv("SQLITE_FILE", "attendance.db")
+        self.database_file = os.path.join(os.path.dirname(__file__), "..", "..", self.sqlite_file)
+        
+        # Determine database type
+        if self.database_url and not force_local:
+            self.db_type = "postgresql"
+            print(f"[DB Manager] Initialized for PostgreSQL via DATABASE_URL")
+        else:
+            self.db_type = "sqlite"
+            print(f"[DB Manager] Initialized for LOCAL SQLite: {self.database_file}")
+        
+        # Initialize database
+        self._init_database()
 
     def _create_connection(self):
-        """ينشئ ويعيد اتصالاً جديدًا بقاعدة البيانات (SQLite أو PostgreSQL)."""
-        if self.is_postgres:
-            if psycopg2 is None:
-                print("psycopg2 not installed. Cannot connect to PostgreSQL.")
-                return None
-            print(f"[DB Manager] Attempting PostgreSQL connection...")
+        """Create database connection"""
+        if self.db_type == "postgresql" and self.database_url:
             try:
-                conn = psycopg2.connect(self.database_url)
-                print("[DB Manager] PostgreSQL connection successful.")
-                return conn
+                import psycopg2
+                return psycopg2.connect(self.database_url)
+            except ImportError:
+                print("[DB Manager] psycopg2 not installed, falling back to SQLite")
+                self.db_type = "sqlite"
             except Exception as e:
-                print(f"PostgreSQL connection error: {e}")
-                return None
-        # SQLite
+                print(f"[DB Manager] PostgreSQL connection failed: {e}, falling back to SQLite")
+                self.db_type = "sqlite"
+        
+        # Use SQLite as default option
         try:
-            conn = sqlite3.connect(self.db_file, timeout=15)
-            conn.row_factory = sqlite3.Row
-            try:
-                conn.execute("PRAGMA foreign_keys = ON")
-            except sqlite3.Error:
-                pass
-            return conn
-        except sqlite3.Error as e:
-            print(f"SQLite connection error: {e}")
-            return None
+            return sqlite3.connect(self.database_file)
+        except Exception as e:
+            print(f"[DB Manager] SQLite connection failed: {e}")
+            raise
+    
+    def _init_database(self):
+        """Initialize database"""
+        try:
+            if self.db_type == "sqlite":
+                # Ensure local database exists
+                if not os.path.exists(self.database_file):
+                    print(f"[DB Manager] Creating new local SQLite database: {self.database_file}")
+                    self._create_sqlite_tables()
+                else:
+                    print(f"[DB Manager] Using existing local SQLite database: {self.database_file}")
+            else:
+                print(f"[DB Manager] Using PostgreSQL database")
+        except Exception as e:
+            print(f"[DB Manager] Database initialization error: {e}")
+            # Fallback to SQLite
+            self.db_type = "sqlite"
+            self._init_database()
+    
+    def _create_sqlite_tables(self):
+        """Create SQLite tables"""
+        try:
+            conn = sqlite3.connect(self.database_file)
+            cursor = conn.cursor()
+            
+            # Create basic tables
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS employees (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    employee_code TEXT UNIQUE,
+                    name TEXT NOT NULL,
+                    job_title TEXT,
+                    department TEXT,
+                    phone_number TEXT UNIQUE,
+                    qr_code TEXT,
+                    web_fingerprint TEXT,
+                    device_token TEXT,
+                    zk_template TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS attendance (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    employee_id TEXT,
+                    employee_name TEXT,
+                    check_time TIMESTAMP,
+                    date DATE,
+                    type TEXT,
+                    location_id INTEGER,
+                    notes TEXT,
+                    work_duration_hours REAL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT UNIQUE NOT NULL,
+                    password TEXT NOT NULL,
+                    role TEXT DEFAULT 'user',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS locations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    latitude REAL,
+                    longitude REAL,
+                    radius_meters REAL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS holidays (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date DATE UNIQUE,
+                    description TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS admin_sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    token TEXT UNIQUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            conn.commit()
+            conn.close()
+            print("[DB Manager] SQLite tables created successfully")
+            
+        except Exception as e:
+            print(f"[DB Manager] Error creating SQLite tables: {e}")
+            raise
 
     def _prepare_query(self, query: str) -> str:
-        """تحويل صيغة البارامترات وعبارات خاصة لتوافق PostgreSQL عند الحاجة."""
-        if not self.is_postgres:
+        """Prepare query based on database type"""
+        if self.db_type == "postgresql":
+            # Convert SQLite to PostgreSQL
+            return query.replace("?", "%s")
+        else:
+            # SQLite
             return query
-        # استبدال placeholder من ? إلى %s
-        rewritten = []
-        q = query
-        # أبسط تحويل: استبدال جميع ? بـ %s عندما لا تكون ضمن علامات
-        # نفترض أن الاستعلامات لدينا بسيطة ولا تحتوي على ? حرفية
-        rewritten_query = q.replace("?", "%s")
-
-        # تحويل INSERT OR REPLACE في app_settings إلى UPSERT
-        if "INSERT OR REPLACE INTO app_settings" in query:
-            rewritten_query = (
-                "INSERT INTO app_settings (key, value) VALUES (%s, %s) "
-                "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
-            )
-        return rewritten_query
-
-    def execute_query(self, query: str, params: tuple = (), fetchone: bool = False, fetchall: bool = False, commit: bool = False) -> Any:
-        """ينفذ استعلام SQL ويدير الاتصال ويعيد قواميس عند الجلب."""
-        conn = self._create_connection()
-        if not conn:
-            return None
+    
+    def _execute_query(self, query: str, params: tuple = None, fetch: bool = True):
+        """Execute query on database"""
+        conn = None
         try:
-            if self.is_postgres:
-                cursor = conn.cursor(cursor_factory=RealDictCursor)
-                final_query = self._prepare_query(query)
+            conn = self._create_connection()
+            if conn is None:
+                return None
+            
+            cursor = conn.cursor()
+            
+            # Prepare query
+            prepared_query = self._prepare_query(query)
+            
+            if params:
+                cursor.execute(prepared_query, params)
             else:
-                cursor = conn.cursor()
-                final_query = query
-
-            cursor.execute(final_query, params)
-            if commit:
-                conn.commit()
-                try:
-                    return cursor.lastrowid  # SQLite
-                except Exception:
-                    return None  # Postgres (بدون RETURNING)
-            if fetchone:
-                result = cursor.fetchone()
-                return dict(result) if result else None
-            if fetchall:
-                results = cursor.fetchall()
-                return [dict(row) for row in results] if results else []
+                cursor.execute(prepared_query)
+            
+            if fetch:
+                if query.strip().upper().startswith("SELECT"):
+                    result = cursor.fetchall()
+                    # Convert results to dictionaries
+                    if result and self.db_type == "sqlite":
+                        columns = [description[0] for description in cursor.description]
+                        return [dict(zip(columns, row)) for row in result]
+                    return result
+                else:
+                    conn.commit()
+                    return cursor.rowcount
+            
+            conn.commit()
+            return True
+            
         except Exception as e:
-            print(f"Query failed: {e}\nQuery: {final_query}\nParams: {params}")
-            return None
+            if conn:
+                conn.rollback()
+            print(f"[DB Manager] Query execution error: {e}")
+            raise
         finally:
-            try:
+            if conn:
                 conn.close()
-            except Exception:
-                pass
+    
+    def _execute_query_with_commit(self, query: str, params: tuple = None):
+        """Execute query with commit - for operations that need commit"""
+        conn = None
+        try:
+            conn = self._create_connection()
+            if conn is None:
+                return None
+            
+            cursor = conn.cursor()
+            
+            # Prepare query
+            prepared_query = self._prepare_query(query)
+            
+            if params:
+                cursor.execute(prepared_query, params)
+            else:
+                cursor.execute(prepared_query)
 
-    # --- دوال إدارة الموظفين ---
+            conn.commit()
+            
+            # Return inserted record ID (for INSERT operations)
+            if query.strip().upper().startswith("INSERT"):
+                return cursor.lastrowid
+            
+            return cursor.rowcount
+            
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            print(f"[DB Manager] Query execution error: {e}")
+            raise
+        finally:
+            if conn:
+                conn.close()
+
+    # --- Employee Management Functions ---
     def get_all_employees(self):
-        return self.execute_query("SELECT * FROM employees ORDER BY name", fetchall=True)
+        return self._execute_query("SELECT * FROM employees ORDER BY name", fetch=True)
 
     def get_employee_by_id(self, employee_id):
-        return self.execute_query("SELECT * FROM employees WHERE id = ?", (employee_id,), fetchone=True)
+        """Get single employee by ID"""
+        result = self._execute_query("SELECT * FROM employees WHERE id = ?", (employee_id,), fetch=True)
+        if result and isinstance(result, list) and len(result) > 0:
+            return result[0]
+        elif result and isinstance(result, dict):
+            return result
+        return None
         
     def get_employee_by_code(self, employee_code):
-        return self.execute_query("SELECT * FROM employees WHERE employee_code = ?", (employee_code,), fetchone=True)
+        """Get single employee by code"""
+        result = self._execute_query("SELECT * FROM employees WHERE employee_code = ?", (employee_code,), fetch=True)
+        if result and isinstance(result, list) and len(result) > 0:
+            return result[0]
+        elif result and isinstance(result, dict):
+            return result
+        return None
 
     def get_employee_by_phone(self, phone_number):
-        return self.execute_query("SELECT * FROM employees WHERE phone_number = ?", (phone_number,), fetchone=True)
+        """Get single employee by phone number"""
+        result = self._execute_query("SELECT * FROM employees WHERE phone_number = ?", (phone_number,), fetch=True)
+        if result and isinstance(result, list) and len(result) > 0:
+            return result[0]
+        elif result and isinstance(result, dict):
+            return result
+        return None
 
     def get_employee_by_token(self, token):
-        return self.execute_query("SELECT * FROM employees WHERE device_token = ?", (token,), fetchone=True)
+        """Get single employee by device token"""
+        result = self._execute_query("SELECT * FROM employees WHERE device_token = ?", (token,), fetch=True)
+        if result and isinstance(result, list) and len(result) > 0:
+            return result[0]
+        elif result and isinstance(result, dict):
+            return result
+        return None
         
     def get_employee_by_fingerprint(self, fingerprint):
-        return self.execute_query("SELECT * FROM employees WHERE web_fingerprint = ?", (fingerprint,), fetchone=True)
+        """Get single employee by fingerprint"""
+        result = self._execute_query("SELECT * FROM employees WHERE web_fingerprint = ?", (fingerprint,), fetch=True)
+        if result and isinstance(result, list) and len(result) > 0:
+            return result[0]
+        elif result and isinstance(result, dict):
+            return result
+        return None
 
     def add_employee(self, data):
-        if self.is_postgres:
+        """Add new employee"""
+        if self.db_type == "postgresql":
             conn = self._create_connection();
             if not conn: return None
             try:
@@ -143,47 +331,72 @@ class DatabaseManager:
                     return row['id'] if row else None
             finally:
                 conn.close()
+        
+        # SQLite
         query = "INSERT INTO employees (employee_code, name, job_title, department, phone_number) VALUES (?, ?, ?, ?, ?)"
         params = (data['employee_code'], data['name'], data['job_title'], data['department'], data['phone_number'])
-        return self.execute_query(query, params, commit=True)
+        return self._execute_query_with_commit(query, params)
     
     def update_employee_qr_code(self, employee_id, qr_code):
-        """تحديث رمز QR للموظف"""
+        """Update employee QR code"""
         query = "UPDATE employees SET qr_code = ? WHERE id = ?"
         params = (qr_code, employee_id)
-        return self.execute_query(query, params, commit=True)
+        return self._execute_query_with_commit(query, params)
     
     def get_employee_by_qr_code(self, qr_code):
-        """البحث عن موظف برمز QR"""
-        return self.execute_query("SELECT * FROM employees WHERE qr_code = ?", (qr_code,), fetchone=True)
+        """Search for employee by QR code"""
+        result = self._execute_query("SELECT * FROM employees WHERE qr_code = ?", (qr_code,), fetch=True)
+        if result and isinstance(result, list) and len(result) > 0:
+            return result[0]
+        elif result and isinstance(result, dict):
+            return result
+        return None
     
     def get_attendance_by_employee_date(self, employee_id, date):
-        """الحصول على تسجيل الحضور لموظف في تاريخ معين"""
-        return self.execute_query(
+        """Get attendance record for employee on specific date"""
+        result = self._execute_query(
             "SELECT * FROM attendance WHERE employee_id = ? AND date = ? ORDER BY check_time DESC LIMIT 1",
-            (employee_id, date), fetchone=True
+            (employee_id, date), fetch=True
         )
+        if result and isinstance(result, list) and len(result) > 0:
+            return result[0]
+        elif result and isinstance(result, dict):
+            return result
+        return None
 
-    def update_employee(self, data):
-        query = "UPDATE employees SET employee_code = ?, name = ?, job_title = ?, department = ?, phone_number = ? WHERE id = ?"
-        params = (data['employee_code'], data['name'], data['job_title'], data['department'], data['phone_number'], data['id'])
-        self.execute_query(query, params, commit=True); return True
+    def update_employee(self, employee_id: str, employee_data: Dict[str, Any]) -> bool:
+        """Update employee"""
+        try:
+            query = """
+                UPDATE employees SET 
+                    employee_code = ?, name = ?, department = ?, job_title = ?, qr_code = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """
+            params = (
+                employee_data.get('employee_code'), employee_data.get('name'), 
+                employee_data.get('department'), employee_data.get('job_title'), 
+                employee_data.get('qr_code'), employee_id
+            )
+            return self._execute_query_with_commit(query, params)
+        except Exception as e:
+            print(f"[DB Manager] Error updating employee: {e}")
+            return False
 
     def delete_employee(self, employee_id):
-        self.execute_query("DELETE FROM employees WHERE id = ?", (employee_id,), commit=True); return True
+        return self._execute_query_with_commit("DELETE FROM employees WHERE id = ?", (employee_id,))
         
     def update_employee_device_info(self, employee_id, fingerprint, token):
-        self.execute_query("UPDATE employees SET web_fingerprint = ?, device_token = ? WHERE id = ?", (fingerprint, token, employee_id), commit=True)
+        return self._execute_query_with_commit("UPDATE employees SET web_fingerprint = ?, device_token = ? WHERE id = ?", (fingerprint, token, employee_id))
         
     def update_employee_zk_template(self, employee_id, zk_template):
-        self.execute_query("UPDATE employees SET zk_template = ? WHERE id = ?", (zk_template, employee_id), commit=True)
+        return self._execute_query_with_commit("UPDATE employees SET zk_template = ? WHERE id = ?", (zk_template, employee_id))
     
     def reset_employee_device_info(self, employee_id):
-        self.execute_query("UPDATE employees SET web_fingerprint = NULL, device_token = NULL WHERE id = ?", (employee_id,), commit=True); return True
+        return self._execute_query_with_commit("UPDATE employees SET web_fingerprint = NULL, device_token = NULL WHERE id = ?", (employee_id,))
         
     def search_employees(self, search_term):
         term = f"%{search_term}%"
-        return self.execute_query("SELECT * FROM employees WHERE name LIKE ? OR phone_number LIKE ? OR employee_code LIKE ?", (term, term, term), fetchall=True)
+        return self._execute_query("SELECT * FROM employees WHERE name LIKE ? OR phone_number LIKE ? OR employee_code LIKE ?", (term, term, term), fetch=True)
 
 
 
@@ -192,7 +405,7 @@ class DatabaseManager:
 
     def add_location(self, data):
         """يضيف موقعًا معتمدًا جديدًا."""
-        if self.is_postgres:
+        if self.db_type == "postgresql":
             conn = self._create_connection();
             if not conn: return None
             try:
@@ -206,24 +419,22 @@ class DatabaseManager:
                 conn.close()
         query = "INSERT INTO locations (name, latitude, longitude, radius_meters) VALUES (?, ?, ?, ?)"
         params = (data['name'], data['latitude'], data['longitude'], data['radius_meters'])
-        return self.execute_query(query, params, commit=True)
+        return self._execute_query_with_commit(query, params)
 
     def get_all_locations(self):
         """يجلب كل المواقع المعتمدة."""
-        return self.execute_query("SELECT * FROM locations ORDER BY name", fetchall=True)
+        return self._execute_query("SELECT * FROM locations ORDER BY name", fetch=True)
 
     def update_location(self, data):
         """يحدّث بيانات موقع معتمد."""
         query = "UPDATE locations SET name = ?, latitude = ?, longitude = ?, radius_meters = ? WHERE id = ?"
         params = (data['name'], data['latitude'], data['longitude'], data['radius_meters'], data['id'])
-        self.execute_query(query, params, commit=True)
-        return True
+        return self._execute_query_with_commit(query, params)
 
     def delete_location(self, location_id):
-        """يحذف موقعًا معتمدًا."""
+        """يDelete موقعًا معتمدًا."""
         query = "DELETE FROM locations WHERE id = ?"
-        self.execute_query(query, (location_id,), commit=True)
-        return True
+        return self._execute_query_with_commit(query, (location_id,))
 
 
 
@@ -255,7 +466,7 @@ class DatabaseManager:
         GROUP BY e.id, e.employee_code, e.name
         ORDER BY e.name;
         """
-        return self.execute_query(query, (start_date, end_date), fetchall=True)
+        return self._execute_query(query, (start_date, end_date), fetch=True)
 
     def get_employee_detailed_log(self, employee_id, start_date, end_date):
         """
@@ -274,7 +485,7 @@ class DatabaseManager:
         WHERE a.employee_id = ? AND a.date BETWEEN ? AND ?
         ORDER BY a.id ASC;
         """
-        return self.execute_query(query, (employee_id, start_date, end_date), fetchall=True)
+        return self._execute_query(query, (employee_id, start_date, end_date), fetch=True)
     
 
 
@@ -306,7 +517,7 @@ class DatabaseManager:
         GROUP BY e.id, a.date
         ORDER BY e.name, a.date;
         """
-        all_first_check_ins = self.execute_query(query, (start_date, end_date), fetchall=True)
+        all_first_check_ins = self._execute_query(query, (start_date, end_date), fetch=True)
 
         if not all_first_check_ins:
             return []
@@ -359,9 +570,9 @@ class DatabaseManager:
         if not all_employees:
             return []
 
-        attendance_records = self.execute_query(
+        attendance_records = self._execute_query(
             "SELECT DISTINCT employee_id, date FROM attendance WHERE date BETWEEN ? AND ?",
-            (start_date_str, end_date_str), fetchall=True
+            (start_date_str, end_date_str), fetch=True
         ) or []
         attendance_set = {(rec['employee_id'], rec['date']) for rec in attendance_records}
 
@@ -415,7 +626,7 @@ class DatabaseManager:
         GROUP BY department
         ORDER BY department;
         """
-        return self.execute_query(query, (start_date, end_date), fetchall=True)
+        return self._execute_query(query, (start_date, end_date), fetch=True)
 
     def get_top_late_employees(self, start_date: str, end_date: str, work_start_time_str: str, late_allowance_minutes: int, top_n: int = 10):
         """
@@ -457,7 +668,7 @@ class DatabaseManager:
         # لاحظ أننا نمرر standard_work_hours مرتين في البارامترات
         params = (standard_work_hours, start_date, end_date, standard_work_hours)
         
-        overtime_records = self.execute_query(query, params, fetchall=True)
+        overtime_records = self._execute_query(query, params, fetch=True)
         return overtime_records if overtime_records else []
     
 
@@ -470,7 +681,7 @@ class DatabaseManager:
 
     def add_holiday(self, date_str, description):
         """يضيف يوم إجازة رسمي جديد."""
-        if self.is_postgres:
+        if self.db_type == "postgresql":
             conn = self._create_connection();
             if not conn: return None
             try:
@@ -483,46 +694,46 @@ class DatabaseManager:
             finally:
                 conn.close()
         query = "INSERT INTO holidays (date, description) VALUES (?, ?)"
-        return self.execute_query(query, (date_str, description), commit=True)
+        return self._execute_query_with_commit(query, (date_str, description))
 
     def get_all_holidays(self):
         """يجلب كل الإجازات الرسمية مرتبة بالتاريخ."""
-        return self.execute_query("SELECT * FROM holidays ORDER BY date DESC", fetchall=True)
+        return self._execute_query("SELECT * FROM holidays ORDER BY date DESC", fetch=True)
 
     def delete_holiday(self, holiday_id):
-        """يحذف يوم إجازة رسمي."""
+        """يDelete يوم إجازة رسمي."""
         query = "DELETE FROM holidays WHERE id = ?"
-        self.execute_query(query, (holiday_id,), commit=True)
-        return True
+        return self._execute_query_with_commit(query, (holiday_id,))
 
 
 
         
 
-    # --- تعديل دالة إضافة سجل الحضور ---
+    # --- Edit دالة Add سجل الحضور ---
     def add_attendance_record(self, data):
         """يضيف سجل حضور جديد (مع location_id)."""
-        if self.is_postgres:
+        if self.db_type == "postgresql":
             conn = self._create_connection();
             if not conn: return None
             try:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     cur.execute(
-                        """
-                        INSERT INTO attendance (employee_id, check_time, date, type, location_id, notes)
-                        VALUES (%s, %s, %s, %s, %s, %s) RETURNING id
-                        """,
+                        "INSERT INTO attendance (employee_id, check_time, date, type, location_id, notes) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
                         (data['employee_id'], data['check_time'], data['date'], data['type'], data.get('location_id'), data.get('notes'))
                     )
-                    conn.commit(); row = cur.fetchone(); return row['id'] if row else None
+                    conn.commit()
+                    row = cur.fetchone()
+                    return row['id'] if row else None
             finally:
                 conn.close()
+        
+        # SQLite
         query = "INSERT INTO attendance (employee_id, check_time, date, type, location_id, notes) VALUES (?, ?, ?, ?, ?, ?)"
         params = (data['employee_id'], data['check_time'], data['date'], data['type'], data.get('location_id'), data.get('notes'))
-        return self.execute_query(query, params, commit=True)
+        return self._execute_query_with_commit(query, params)
     
     def add_attendance(self, data):
-        """دالة مختصرة لإضافة سجل حضور (لتوافق مع QR Scanner)"""
+        """دالة مختصرة لAdd سجل حضور (لتوافق مع QR Scanner)"""
         return self.add_attendance_record(data)
     
 
@@ -550,88 +761,116 @@ class DatabaseManager:
         ORDER BY a.id
         """
         # --- نهاية التصحيح الحاسم ---
-        return self.execute_query(query, (target_date,), fetchall=True)
+        return self._execute_query(query, (target_date,), fetch=True)
         
 
-    # --- بداية التعديل الحاسم ---
+    # --- بداية الEdit الحاسم ---
     def get_last_action_today(self, employee_id, date_str):
         """
         يجلب آخر إجراء (Check-In/Check-Out) لموظف في يوم محدد.
         يعيد سلسلة نصية ('Check-In' أو 'Check-Out') أو None.
         """
-        query = "SELECT type FROM attendance WHERE employee_id = ? AND date = ? ORDER BY id DESC LIMIT 1"
-        result = self.execute_query(query, (employee_id, date_str), fetchone=True)
-        return result['type'] if result else None
-    # --- نهاية التعديل الحاسم ---
+        result = self._execute_query("SELECT type FROM attendance WHERE employee_id = ? AND date = ? ORDER BY id DESC LIMIT 1", (employee_id, date_str), fetch=True)
+        if result and isinstance(result, list) and len(result) > 0:
+            return result[0].get('type')
+        elif result and isinstance(result, dict):
+            return result.get('type')
+        return None
+    # --- نهاية الEdit الحاسم ---
     
-    def get_check_in_time_today(self, employee_id, date_str):
-        """
-        يجلب أول وقت تسجيل دخول لموظف في يوم محدد.
-        يعيد سلسلة نصية (HH:MM:SS) أو None.
-        """
+    def get_first_check_in_time(self, employee_id: str, date_str: str) -> Optional[str]:
         query = "SELECT check_time FROM attendance WHERE employee_id = ? AND date = ? AND type = 'Check-In' ORDER BY id ASC LIMIT 1"
-        result = self.execute_query(query, (employee_id, date_str), fetchone=True)
-        return result['check_time'] if result else None
+        result = self._execute_query(query, (employee_id, date_str), fetch=True)
+        if result and isinstance(result, list) and len(result) > 0:
+            return result[0].get('check_time')
+        elif result and isinstance(result, dict):
+            return result.get('check_time')
+        return None
 
     def update_checkout_with_duration(self, record_id, duration_hours):
-        self.execute_query("UPDATE attendance SET work_duration_hours = ? WHERE id = ?", (duration_hours, record_id), commit=True)
+        return self._execute_query_with_commit("UPDATE attendance SET work_duration_hours = ? WHERE id = ?", (duration_hours, record_id))
 
     def get_employee_attendance_history(self, employee_id):
-        return self.execute_query("SELECT date, check_time, type, notes FROM attendance WHERE employee_id = ? ORDER BY id DESC", (employee_id,), fetchall=True)
+        return self._execute_query("SELECT date, check_time, type, notes FROM attendance WHERE employee_id = ? ORDER BY id DESC", (employee_id,), fetch=True)
 
     def get_attendance_between_dates(self, start_date, end_date):
-        return self.execute_query("SELECT * FROM attendance WHERE date BETWEEN ? AND ?", (start_date, end_date), fetchall=True)
+        return self._execute_query("SELECT * FROM attendance WHERE date BETWEEN ? AND ?", (start_date, end_date), fetch=True)
 
     # --- دوال إدارة المستخدمين والإعدادات ---
     def get_user_by_username(self, username: str):
-        return self.execute_query('SELECT * FROM "users" WHERE username = ?', (username,), fetchone=True)
+        """يجلب مستخدماً واحداً بالاسم"""
+        result = self._execute_query('SELECT * FROM "users" WHERE username = ?', (username,), fetch=True)
+        # التأكد من إرجاع قاموس واحد بدلاً من قائمة
+        if result and isinstance(result, list) and len(result) > 0:
+            return result[0]  # إرجاع العنصر الأول فقط
+        elif result and isinstance(result, dict):
+            return result
+        return None
         
     def get_all_users(self):
-        return self.execute_query('SELECT id, username, role FROM "users"', fetchall=True)
+        return self._execute_query('SELECT id, username, role FROM "users"', fetch=True)
 
-    def add_user(self, username, hashed_password, role):
-        """يضيف مستخدماً جديداً ويعيد المعرف. يرجع None إذا كان الاسم موجوداً بالفعل."""
-        # تحقق مسبق من التكرار لتقديم رسالة أدق
-        existing = self.execute_query('SELECT id FROM "users" WHERE username = ?', (username,), fetchone=True)
-        if existing:
+    def add_user(self, user_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Add مستخدم"""
+        try:
+            if isinstance(user_data, dict):
+                username = user_data.get('username')
+                password = user_data.get('password', 'default123')
+                role = user_data.get('role', 'user')
+            else:
+                username = user_data
+                password = 'default123'
+                role = 'user'
+            
+            hashed_password = hashlib.sha256(password.encode()).hexdigest()
+            user_id = self._execute_query_with_commit('INSERT INTO "users" (username, password, role) VALUES (?, ?, ?)', (username, hashed_password, role))
+            
+            if user_id:
+                return {
+                    'id': user_id,
+                    'username': username,
+                    'role': role
+                }
             return None
-        return self.execute_query('INSERT INTO "users" (username, password, role) VALUES (?, ?, ?)', (username, hashed_password, role), commit=True)
+            
+        except Exception as e:
+            print(f"[DB Manager] Error adding user: {e}")
+            return None
 
     def update_user_password(self, user_id, hashed_password):
-        self.execute_query('UPDATE "users" SET password = ? WHERE id = ?', (hashed_password, user_id), commit=True); return True
+        return self._execute_query_with_commit('UPDATE "users" SET password = ? WHERE id = ?', (hashed_password, user_id))
 
     def update_user_role(self, user_id, new_role):
-        self.execute_query('UPDATE "users" SET role = ? WHERE id = ?', (new_role, user_id), commit=True); return True
+        return self._execute_query_with_commit('UPDATE "users" SET role = ? WHERE id = ?', (new_role, user_id))
 
     def delete_user(self, user_id):
         if user_id == 1: return False
-        self.execute_query('DELETE FROM "users" WHERE id = ?', (user_id,), commit=True); return True
+        return self._execute_query_with_commit('DELETE FROM "users" WHERE id = ?', (user_id,))
 
     def get_all_settings(self):
-        rows = self.execute_query("SELECT key, value FROM app_settings", fetchall=True)
+        rows = self._execute_query("SELECT key, value FROM app_settings", fetch=True)
         return {row['key']: row['value'] for row in rows} if rows else {}
 
     def save_setting(self, key, value):
-        self.execute_query("INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)", (key, value), commit=True)
+        return self._execute_query_with_commit("INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)", (key, value))
 
 
     # --- دوال إدارة جلسات المشرفين ---
     def create_admin_session(self, user_id: int, token: str) -> bool:
         """إنشاء جلسة مشرف جديدة في قاعدة البيانات."""
         query = "INSERT INTO admin_sessions (user_id, token) VALUES (?, ?)"
-        # لتجنب التعقيد، سنقوم بحذف الجلسات القديمة للمستخدم قبل إنشاء واحدة جديدة
-        self.execute_query("DELETE FROM admin_sessions WHERE user_id = ?", (user_id,), commit=True)
-        self.execute_query(query, (user_id, token), commit=True)
-        return True
+        # لتجنب التعقيد، سنقوم بDelete الجلسات القديمة للمستخدم قبل إنشاء واحدة جديدة
+        self._execute_query_with_commit("DELETE FROM admin_sessions WHERE user_id = ?", (user_id,))
+        return self._execute_query_with_commit(query, (user_id, token))
 
     def validate_admin_session(self, token: str) -> Optional[dict]:
         """التحقق من صلاحية جلسة المشرف وإرجاع بيانات المستخدم إذا كانت صالحة."""
-        # حذف الجلسات التي مضى عليها أكثر من ساعة واحدة
-        if self.is_postgres:
-            self.execute_query("DELETE FROM admin_sessions WHERE created_at < NOW() - INTERVAL '1 hour'", commit=True)
+        # Delete الجلسات التي مضى عليها أكثر من ساعة واحدة
+        if self.db_type == "postgresql":
+            self._execute_query_with_commit("DELETE FROM admin_sessions WHERE created_at < NOW() - INTERVAL '1 hour'")
         else:
             # SQLite
-            self.execute_query("DELETE FROM admin_sessions WHERE created_at < DATETIME('now', '-1 hour')", commit=True)
+            self._execute_query_with_commit("DELETE FROM admin_sessions WHERE created_at < DATETIME('now', '-1 hour')")
         
         query = """
             SELECT u.id, u.username, u.role 
@@ -639,6 +878,214 @@ class DatabaseManager:
             JOIN users u ON s.user_id = u.id
             WHERE s.token = ?
         """
-        return self.execute_query(query, (token,), fetchone=True)
+        result = self._execute_query(query, (token,), fetch=True)
+        if result and isinstance(result, list) and len(result) > 0:
+            return result[0]
+        elif result and isinstance(result, dict):
+            return result
+        return None
 
+    def authenticate_user(self, username: str, password: str) -> Optional[Dict[str, Any]]:
+        """مصادقة المستخدم"""
+        try:
+            user = self.get_user_by_username(username)
+            if user and self._verify_password(password, user.get('password', '')):
+                return user
+            return None
+        except Exception as e:
+            print(f"[DB Manager] Authentication error: {e}")
+            return None
+    
+    def _verify_password(self, password: str, hashed: str) -> bool:
+        """التحقق من كلمة المرور"""
+        try:
+            import hashlib
+            return hashlib.sha256(password.encode()).hexdigest() == hashed
+        except Exception:
+            return False
+    
+    def setup_default_data(self):
+        """إعداد البيانات الافتراضية"""
+        try:
+            # Add مستخدم افتراضي
+            admin_password = hashlib.sha256("admin123".encode()).hexdigest()
+            # Check if admin user already exists
+            if not self.get_user_by_username("admin"):
+                self._execute_query_with_commit('INSERT INTO "users" (username, password, role) VALUES (?, ?, ?)', ("admin", admin_password, "admin"))
+            
+            # Add إعدادات افتراضية
+            default_settings = {
+                'theme': 'light',
+                'language': 'ar',
+                'work_start_time': '09:00',
+                'work_end_time': '17:00',
+                'late_allowance_minutes': '15'
+            }
+            
+            for key, value in default_settings.items():
+                # Check if setting exists before saving
+                current_settings = self.get_all_settings()
+                if key not in current_settings:
+                    self.save_setting(key, value)
+            
+            print("[DB Manager] Default data setup completed")
+            
+        except Exception as e:
+            print(f"[DB Manager] Error setting up default data: {e}")
+    
+    def get_employee(self, employee_id: str) -> Optional[Dict[str, Any]]:
+        """الحصول على موظف"""
+        return self.get_employee_by_id(employee_id)
+    
+    def record_attendance(self, attendance_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """تسجيل حضور"""
+        try:
+            result_id = self.add_attendance_record(attendance_data)
+            if result_id:
+                return {
+                    'id': result_id,
+                    'employee_id': attendance_data.get('employee_id'),
+                    'employee_name': attendance_data.get('employee_name'),
+                    'check_time': attendance_data.get('check_time'),
+                    'date': attendance_data.get('date'),
+                    'type': attendance_data.get('type', 'Check-In')
+                }
+            return None
+        except Exception as e:
+            print(f"[DB Manager] Error recording attendance: {e}")
+            return None
+    
+    def delete_employee(self, employee_id: str) -> bool:
+        """Delete موظف"""
+        try:
+            return self._execute_query_with_commit("DELETE FROM employees WHERE id = ?", (employee_id,))
+        except Exception as e:
+            print(f"[DB Manager] Error deleting employee: {e}")
+            return False
+    
+    def get_attendance_by_id(self, attendance_id: str) -> Optional[Dict[str, Any]]:
+        """الحصول على سجل حضور"""
+        try:
+            conn = self._create_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM attendance WHERE id = ?", (attendance_id,))
+            result = cursor.fetchone()
+            conn.close()
+            
+            if result:
+                columns = [description[0] for description in cursor.description]
+                return dict(zip(columns, result))
+            return None
+            
+        except Exception as e:
+            print(f"[DB Manager] Error getting attendance: {e}")
+            return None
+    
+    def add_user(self, user_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Add مستخدم"""
+        try:
+            if isinstance(user_data, dict):
+                username = user_data.get('username')
+                password = user_data.get('password', 'default123')
+                role = user_data.get('role', 'user')
+            else:
+                username = user_data
+                password = 'default123'
+                role = 'user'
+            
+            hashed_password = hashlib.sha256(password.encode()).hexdigest()
+            user_id = self._execute_query_with_commit('INSERT INTO "users" (username, password, role) VALUES (?, ?, ?)', (username, hashed_password, role))
+            
+            if user_id:
+                return {
+                    'id': user_id,
+                    'username': username,
+                    'role': role
+                }
+            return None
+            
+        except Exception as e:
+            print(f"[DB Manager] Error adding user: {e}")
+            return None
+    
+    def update_setting(self, key: str, value: Any) -> bool:
+        """Update إعداد"""
+        try:
+            self.save_setting(key, str(value))
+            return True
+        except Exception as e:
+            print(f"[DB Manager] Error updating setting: {e}")
+            return False
 
+    def get_attendance_records_for_date(self, target_date: str) -> List[Dict[str, Any]]:
+        query = "SELECT * FROM attendance WHERE date = ? ORDER BY check_time ASC"
+        return self._execute_query(query, (target_date,), fetch=True)
+
+    def get_last_attendance_type(self, employee_id: str, date_str: str) -> Optional[str]:
+        query = "SELECT type FROM attendance WHERE employee_id = ? AND date = ? ORDER BY id DESC LIMIT 1"
+        result = self._execute_query(query, (employee_id, date_str), fetch=True)
+        if result and isinstance(result, list) and len(result) > 0:
+            return result[0].get('type')
+        elif result and isinstance(result, dict):
+            return result.get('type')
+        return None
+
+    def get_check_in_today(self, employee_id, date_str):
+        """
+        يجلب أول وقت تسجيل دخول لموظف في يوم محدد.
+        يعيد سلسلة نصية (HH:MM:SS) أو None.
+        """
+        result = self._execute_query("SELECT check_time FROM attendance WHERE employee_id = ? AND date = ? AND type = 'Check-In' ORDER BY id ASC LIMIT 1", (employee_id, date_str), fetch=True)
+        if result and isinstance(result, list) and len(result) > 0:
+            return result[0].get('check_time')
+        elif result and isinstance(result, dict):
+            return result.get('check_time')
+        return None
+    
+    # 🆕 دالة صحة النظام
+    def get_system_health(self) -> Dict[str, Any]:
+        """الحصول على صحة النظام"""
+        try:
+            health_status = {
+                'overall_status': 'Healthy',
+                'database_connected': True,
+                'total_tables': 0,
+                'total_records': 0,
+                'last_check': datetime.now().isoformat(),
+                'errors': []
+            }
+            
+            # فحص الاتصال بقاعدة البيانات
+            try:
+                conn = self._create_connection()
+                cursor = conn.cursor()
+                
+                # الحصول على عدد الجداول
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                tables = cursor.fetchall()
+                health_status['total_tables'] = len(tables)
+                
+                # الحصول على إجمالي السجلات
+                total_records = 0
+                for table in tables:
+                    table_name = table[0]
+                    cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+                    count = cursor.fetchone()[0]
+                    total_records += count
+                
+                health_status['total_records'] = total_records
+                conn.close()
+                
+            except Exception as e:
+                health_status['database_connected'] = False
+                health_status['overall_status'] = 'Unhealthy'
+                health_status['errors'].append(f"Database connection error: {str(e)}")
+            
+            return health_status
+            
+        except Exception as e:
+            return {
+                'overall_status': 'Error',
+                'error': str(e),
+                'timestamp': datetime.now().isoformat()
+            }

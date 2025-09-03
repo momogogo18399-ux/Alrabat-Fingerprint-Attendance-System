@@ -30,27 +30,94 @@ except ImportError:
 
 async def setup_database():
     """
-    Initialize the database. Uses Supabase if configured, otherwise PostgreSQL or SQLite.
+    Initialize the database. Uses Hybrid mode if configured, otherwise falls back to individual databases.
     """
-    # Check for Supabase configuration first
+    # Check for Hybrid mode configuration
+    HYBRID_MODE = os.getenv('HYBRID_MODE', 'true').lower() == 'true'
+    IS_SUPABASE = bool(os.getenv("NEXT_PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL"))
+    
+    if HYBRID_MODE and IS_SUPABASE:
+        print("🔄 Hybrid Database Mode detected. Setting up local SQLite with ONE-TIME Supabase sync...")
+        try:
+            # Setup local SQLite first (this is the primary database now)
+            conn = None
+            try:
+                is_new = not os.path.exists(DATABASE_FILE)
+                if is_new:
+                    print("📁 Creating new local SQLite database...")
+                conn = sqlite3.connect(DATABASE_FILE)
+                if is_new:
+                    create_tables(conn)
+                    create_default_settings(conn)
+                    create_default_admin(conn)
+                    print("✅ Local SQLite database setup complete.")
+                
+                # Run migrations
+                try:
+                    migrate_sqlite_schema(conn)
+                except Exception as e:
+                    print(f"⚠️ SQLite migration warning: {e}")
+                    
+            except sqlite3.Error as e:
+                print(f"❌ SQLite database error during setup: {e}")
+            finally:
+                if conn:
+                    conn.close()
+            
+            # Initialize Supabase tables in background (ONE-TIME ONLY)
+            try:
+                print("🔄 Initializing Supabase connection for ONE-TIME data download...")
+                from .supabase_migrations import run_supabase_migrations
+                
+                # Run Supabase setup in background thread
+                import threading
+                def supabase_setup():
+                    try:
+                        success = run_supabase_migrations()
+                        if success:
+                            print("✅ Supabase tables initialized successfully (ONE-TIME setup).")
+                            print("🚫 After initial data download, Supabase will be DISABLED")
+                        else:
+                            print("⚠️ Supabase initialization had issues, but local database is ready.")
+                    except Exception as e:
+                        print(f"⚠️ Supabase setup error: {e}, but local database is ready.")
+                
+                supabase_thread = threading.Thread(target=supabase_setup, daemon=True)
+                supabase_thread.start()
+                
+            except Exception as e:
+                print(f"⚠️ Supabase setup error: {e}, but local database is ready.")
+            
+            print("🚀 Hybrid Database System is ready!")
+            print("   📍 All operations are now LOCAL for maximum speed")
+            print("   🔄 ONE-TIME Supabase sync for initial data download")
+            print("   🚫 Supabase will be DISABLED after initial sync")
+            print("   ⚡ No more 'not responding' or slow performance!")
+            return
+            
+        except Exception as e:
+            print(f"❌ Hybrid setup error: {e}")
+            print("🔄 Falling back to local database only...")
+    
+    # Fallback to individual database setup
     if IS_SUPABASE:
-        print("Supabase configuration detected. Initializing Supabase...")
+        print("🔗 Supabase configuration detected. Initializing Supabase...")
         try:
             from .supabase_migrations import run_supabase_migrations
             success = await run_supabase_migrations()
             if success:
-                print("Supabase initialization completed successfully.")
+                print("✅ Supabase initialization completed successfully.")
                 return
             else:
-                print("Warning: Supabase initialization had issues. Falling back to local database.")
+                print("⚠️ Supabase initialization had issues. Falling back to local database.")
         except Exception as e:
-            print(f"Error initializing Supabase: {e}")
-            print("Falling back to local database configuration...")
+            print(f"❌ Error initializing Supabase: {e}")
+            print("🔄 Falling back to local database configuration...")
     
     # Fall back to PostgreSQL if configured
     if IS_POSTGRES:
         if psycopg2 is None:
-            print("psycopg2 not installed; cannot set up PostgreSQL schema.")
+            print("❌ psycopg2 not installed; cannot set up PostgreSQL schema.")
             return
         try:
             with psycopg2.connect(DATABASE_URL) as conn:
@@ -59,9 +126,9 @@ async def setup_database():
                     create_default_settings_postgres(cur)
                     create_default_admin_postgres(cur)
                 conn.commit()
-            print("PostgreSQL schema ensured.")
+            print("✅ PostgreSQL schema ensured.")
         except Exception as e:
-            print(f"PostgreSQL setup error: {e}")
+            print(f"❌ PostgreSQL setup error: {e}")
         return
 
     # SQLite path (fallback)
@@ -69,20 +136,20 @@ async def setup_database():
     try:
         is_new = not os.path.exists(DATABASE_FILE)
         if is_new:
-            print("Database not found. Creating a new SQLite database for local use...")
+            print("📁 Database not found. Creating a new SQLite database for local use...")
         conn = sqlite3.connect(DATABASE_FILE)
         if is_new:
             create_tables(conn)
             create_default_settings(conn)
             create_default_admin(conn)
-            print("Local SQLite database setup complete.")
+            print("✅ Local SQLite database setup complete.")
         # Always run lightweight migrations to keep schema up-to-date
         try:
             migrate_sqlite_schema(conn)
         except Exception as e:
-            print(f"SQLite migration warning: {e}")
+            print(f"⚠️ SQLite migration warning: {e}")
     except sqlite3.Error as e:
-        print(f"SQLite database error during setup: {e}")
+        print(f"❌ SQLite database error during setup: {e}")
     finally:
         if conn:
             conn.close()
@@ -111,7 +178,8 @@ def create_tables(conn: sqlite3.Connection):
         device_token TEXT UNIQUE,
         zk_template TEXT,
         qr_code TEXT UNIQUE,
-        status TEXT DEFAULT 'Active'
+        status TEXT DEFAULT 'Active',
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );""")
 
     # 2. جدول مستخدمي البرنامج
@@ -180,7 +248,7 @@ def create_tables(conn: sqlite3.Connection):
         row = cur2.fetchone()
         create_sql = row[0] if row else ''
         if "Scanner" not in create_sql:
-            # إعادة إنشاء الجدول لتحديث CHECK constraint
+            # إعادة إنشاء الجدول لUpdate CHECK constraint
             cur2.execute("PRAGMA foreign_keys=off")
             cur2.execute("BEGIN TRANSACTION")
             cur2.execute("CREATE TABLE users_new (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, password TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('Viewer','Manager','HR','Admin','Scanner')))")
@@ -224,7 +292,7 @@ def create_tables(conn: sqlite3.Connection):
 
 
 def migrate_sqlite_schema(conn: sqlite3.Connection):
-    """ترقيات بسيطة للحفاظ على المخطط مواكباً (تشمل إضافة دور Scanner)."""
+    """ترقيات بسيطة للحفاظ على المخطط مواكباً (تشمل Add دور Scanner)."""
     try:
         cur = conn.cursor()
         # تحقق من دعم دور Scanner في users
@@ -374,6 +442,16 @@ def create_tables_postgres(cur):
             token TEXT PRIMARY KEY,
             user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+        """
+    )
+
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS holidays (
+            id SERIAL PRIMARY KEY,
+            date TEXT NOT NULL UNIQUE,
+            description TEXT NOT NULL
         );
         """
     )

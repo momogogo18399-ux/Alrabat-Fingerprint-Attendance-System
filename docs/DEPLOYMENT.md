@@ -79,7 +79,7 @@ FLASK_DEBUG=0
 FLASK_ENV=production
 
 # Database Settings
-DATABASE_URL=postgresql://attendance:strongpass@127.0.0.1:5432/attendance
+DATABASE_URL=postgresql://username:password@host:port/databasendance
 SQLITE_FILE=/opt/attendance/attendance.db
 
 # Update Server Settings

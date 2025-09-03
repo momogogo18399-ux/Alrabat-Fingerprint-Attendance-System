@@ -9,7 +9,7 @@ from app.database.database_manager import DatabaseManager
 
 class QRCodeDialog(QDialog):
     """
-    نافذة حوار لعرض رمز QR للموظف
+    Dialog window to display QR code للموظف
     """
     def __init__(self, employee_data, parent=None):
         super().__init__(parent)
@@ -35,7 +35,7 @@ class QRCodeDialog(QDialog):
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title_label)
         
-        # معلومات الموظف
+        # Information الموظف
         info_frame = QFrame()
         info_frame.setFrameStyle(QFrame.Shape.StyledPanel)
         info_layout = QVBoxLayout(info_frame)
@@ -97,7 +97,7 @@ class QRCodeDialog(QDialog):
                         self.db_manager.update_employee_qr_code(employee_id, qr_code)
                         print(f"تم إنشاء رمز QR جديد للموظف: {self.employee_data.get('name')}")
                     else:
-                        raise Exception("فشل في إنشاء رمز QR")
+                        raise Exception("Failed في إنشاء رمز QR")
             else:
                 raise Exception("لم يتم العثور على بيانات الموظف")
             
@@ -110,7 +110,7 @@ class QRCodeDialog(QDialog):
                                f"{self.tr('Failed to generate QR code:')}\n{str(e)}")
     
     def refresh_qr_code(self):
-        """تحديث رمز QR"""
+        """Update رمز QR"""
         reply = QMessageBox.question(
             self, 
             self.tr("Refresh QR Code"), 
@@ -122,7 +122,7 @@ class QRCodeDialog(QDialog):
             self.generate_qr_code()
     
     def save_qr_code(self):
-        """حفظ رمز QR كصورة"""
+        """Save رمز QR كصورة"""
         try:
             file_path, _ = QFileDialog.getSaveFileName(
                 self,

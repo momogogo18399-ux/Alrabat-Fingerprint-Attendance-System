@@ -63,12 +63,12 @@ class QRCodeManager:
                         if key in default_settings:
                             default_settings[key] = value
         except Exception as e:
-            print(f"خطأ في تحميل إعدادات QR: {e}")
+            print(f"Error في تحميل إعدادات QR: {e}")
         
         return default_settings
     
     def update_settings(self, new_settings):
-        """تحديث الإعدادات"""
+        """Update الإعدادات"""
         self.settings.update(new_settings)
     
     def _generate_secret_key(self) -> str:
@@ -101,66 +101,85 @@ class QRCodeManager:
         :param employee_data: بيانات الموظف
         :return: رمز QR مبسط
         """
-        # إنشاء معرف فريد للموظف
-        employee_id = str(employee_data.get('id', ''))
-        employee_code = employee_data.get('employee_code', '')
-        
-        # استخدام تنسيق التاريخ من الإعدادات
-        date_format = self.settings.get('date_format', '%Y%m%d%H%M%S')
-        timestamp = datetime.now().strftime(date_format)
-        
-        # بناء البيانات حسب الإعدادات
-        qr_parts = []
-        
-        if self.settings.get('include_employee_id', True):
-            qr_parts.append(f"ID:{employee_id}")
-        
-        if self.settings.get('include_employee_code', True):
-            qr_parts.append(f"CODE:{employee_code}")
-        
-        if self.settings.get('include_name', False):
-            employee_name = employee_data.get('name', '')
-            # تحويل النص العربي إلى Base64 لتجنب مشاكل التشفير
-            if employee_name:
+        try:
+            # التأكد من أن employee_data هو dict
+            if not isinstance(employee_data, dict):
+                print(f"❌ Invalid employee_data type: {type(employee_data)}")
+                return f"EMP:ERROR:INVALID_DATA:{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            
+            # إنشاء معرف فريد للموظف مع معالجة القيم الفارغة
+            employee_id = str(employee_data.get('id', '')).strip()
+            employee_code = str(employee_data.get('employee_code', '')).strip()
+            employee_name = str(employee_data.get('name', '')).strip()
+            
+            # التأكد من أن القيم ليست فارغة
+            if not employee_id or employee_id == 'None':
+                employee_id = 'UNKNOWN'
+            if not employee_code or employee_code == 'None':
+                employee_code = 'UNKNOWN'
+            if not employee_name or employee_name == 'None':
+                employee_name = 'UNKNOWN'
+            
+            # استخدام تنسيق التاريخ من الإعدادات
+            date_format = self.settings.get('date_format', '%Y%m%d%H%M%S')
+            timestamp = datetime.now().strftime(date_format)
+            
+            # بناء البيانات حسب الإعدادات
+            qr_parts = []
+            
+            if self.settings.get('include_employee_id', True):
+                qr_parts.append(f"ID:{employee_id}")
+            
+            if self.settings.get('include_employee_code', True):
+                qr_parts.append(f"CODE:{employee_code}")
+            
+            if self.settings.get('include_name', False):
+                # تحويل النص العربي إلى Base64 لتجنب مشاكل التشفير
+                if employee_name and employee_name != 'UNKNOWN':
+                    try:
+                        encoded_name = base64.b64encode(employee_name.encode('utf-8')).decode('ascii')
+                        qr_parts.append(f"NAME:{encoded_name}")
+                    except:
+                        qr_parts.append(f"NAME:{employee_name}")
+            
+            if self.settings.get('include_department', False):
+                department = str(employee_data.get('department', '')).strip()
+                if department and department != 'None':
+                    try:
+                        encoded_dept = base64.b64encode(department.encode('utf-8')).decode('ascii')
+                        qr_parts.append(f"DEPT:{encoded_dept}")
+                    except:
+                        qr_parts.append(f"DEPT:{department}")
+            
+            if self.settings.get('include_timestamp', True):
+                qr_parts.append(f"TIME:{timestamp}")
+            
+            # Add بيانات إضافية إذا كانت موجودة
+            additional_data = self.settings.get('additional_data', '')
+            if additional_data:
                 try:
-                    encoded_name = base64.b64encode(employee_name.encode('utf-8')).decode('ascii')
-                    qr_parts.append(f"NAME:{encoded_name}")
+                    # محاولة تحليل JSON
+                    parsed_data = json.loads(additional_data)
+                    for key, value in parsed_data.items():
+                        qr_parts.append(f"{key}:{value}")
                 except:
-                    qr_parts.append(f"NAME:{employee_name}")
-        
-        if self.settings.get('include_department', False):
-            department = employee_data.get('department', '')
-            if department:
-                try:
-                    encoded_dept = base64.b64encode(department.encode('utf-8')).decode('ascii')
-                    qr_parts.append(f"DEPT:{encoded_dept}")
-                except:
-                    qr_parts.append(f"DEPT:{department}")
-        
-        if self.settings.get('include_timestamp', True):
-            qr_parts.append(f"TIME:{timestamp}")
-        
-        # إضافة بيانات إضافية إذا كانت موجودة
-        additional_data = self.settings.get('additional_data', '')
-        if additional_data:
-            try:
-                # محاولة تحليل JSON
-                import json
-                parsed_data = json.loads(additional_data)
-                for key, value in parsed_data.items():
-                    qr_parts.append(f"{key}:{value}")
-            except:
-                # إذا فشل التحليل، أضف النص كما هو
-                qr_parts.append(f"EXTRA:{additional_data}")
-        
-        # إنشاء الرمز النهائي
-        if qr_parts:
-            qr_code = "|".join(qr_parts)
-        else:
-            # إذا لم يتم تحديد أي بيانات، استخدم التنسيق الأساسي
-            qr_code = f"EMP:{employee_id}:{employee_code}:{timestamp}"
-        
-        return qr_code
+                    # إذا Failed التحليل، أضف النص كما هو
+                    qr_parts.append(f"EXTRA:{additional_data}")
+            
+            # إنشاء الرمز النهائي
+            if qr_parts:
+                qr_code = "|".join(qr_parts)
+            else:
+                # إذا لم يتم تحديد أي بيانات، استخدم التنسيق الأساسي
+                qr_code = f"EMP:{employee_id}:{employee_code}:{timestamp}"
+            
+            print(f"✅ Generated QR code: {qr_code[:50]}...")
+            return qr_code
+            
+        except Exception as e:
+            print(f"❌ Error generating QR code: {e}")
+            # إرجاع رمز QR بسيط في حالة الخطأ
+            return f"EMP:ERROR:{datetime.now().strftime('%Y%m%d%H%M%S')}"
     
     def create_qr_image(self, qr_code: str, size: int = None) -> QPixmap:
         """
@@ -174,6 +193,11 @@ class QRCodeManager:
             if size is None:
                 size = self.settings.get('size', 300)
             
+            # التأكد من أن qr_code صحيح
+            if not qr_code or not isinstance(qr_code, str):
+                print(f"❌ Invalid QR code: {qr_code}")
+                qr_code = "ERROR:INVALID_CODE"
+            
             # إنشاء رمز QR مع الإعدادات
             qr = qrcode.QRCode(
                 version=1,
@@ -182,13 +206,8 @@ class QRCodeManager:
                 border=self.settings.get('border', 4)
             )
             
-            # تحويل النص إلى UTF-8 bytes ثم إلى base64 لتجنب مشاكل التشفير
-            try:
-                safe_qr_code = base64.b64encode(qr_code.encode('utf-8')).decode('ascii')
-                qr.add_data(safe_qr_code)
-            except:
-                # إذا فشل، استخدم النص الأصلي
-                qr.add_data(qr_code)
+            # إضافة البيانات مباشرة بدون تشفير إضافي
+            qr.add_data(qr_code)
             qr.make(fit=True)
             
             # إنشاء الصورة
@@ -197,53 +216,74 @@ class QRCodeManager:
                 back_color=self.settings.get('background_color', '#FFFFFF')
             )
             
-            # إضافة شعار إذا كان مفعلاً
+            # Add شعار إذا كان Enabledاً
             if self.settings.get('add_logo') and self.settings.get('logo_path'):
                 img = self.add_logo_to_qr(img, self.settings['logo_path'])
             
-            # تحويل إلى QPixmap
-            img_byte_arr = io.BytesIO()
-            img.save(img_byte_arr, format='PNG')
-            img_byte_arr = img_byte_arr.getvalue()
+            # تحويل إلى QPixmap بطريقة آمنة
+            # حفظ مؤقتاً ثم تحميل
+            temp_path = f"temp_qr_{hash(qr_code) % 10000}.png"
+            img.save(temp_path, format='PNG')
+            pixmap = QPixmap(temp_path)
             
-            pixmap = QPixmap()
-            pixmap.loadFromData(img_byte_arr)
+            # حذف الملف المؤقت
+            try:
+                os.remove(temp_path)
+            except:
+                pass
             
             # تغيير الحجم إذا لزم الأمر
             if pixmap.width() != size:
                 pixmap = pixmap.scaled(size, size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
             
+            print(f"✅ Created QR image successfully: {pixmap.width()}x{pixmap.height()}")
             return pixmap
             
         except Exception as e:
-            print(f"خطأ في إنشاء صورة QR: {e}")
-            # إنشاء صورة خطأ بسيطة
+            print(f"❌ Error في إنشاء صورة QR: {e}")
+            # إنشاء صورة Error بسيطة
             from PyQt6.QtGui import QColor
-            error_pixmap = QPixmap(size, size)
+            error_pixmap = QPixmap(size or 300, size or 300)
             error_pixmap.fill(QColor(255, 255, 255))  # أبيض
             return error_pixmap
     
     def save_qr_image(self, qr_code: str, file_path: str) -> bool:
         """
-        حفظ رمز QR كصورة
+        Save رمز QR كصورة
         :param qr_code: رمز QR
-        :param file_path: مسار الملف للحفظ
-        :return: True إذا تم الحفظ بنجاح
+        :param file_path: مسار الملف للSave
+        :return: True إذا Saved successfully
         """
         try:
-            # إنشاء صورة QR
-            qr_pixmap = self.create_qr_image(qr_code, 300)
+            # إنشاء رمز QR مباشرة بدون QPixmap
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=getattr(qrcode.constants, f'ERROR_CORRECT_{self.settings.get("error_correction", "L")}'),
+                box_size=self.settings.get('box_size', 10),
+                border=self.settings.get('border', 4)
+            )
             
-            # حفظ الصورة
-            success = qr_pixmap.save(file_path, "PNG")
-            return success
+            # إضافة البيانات
+            qr.add_data(qr_code)
+            qr.make(fit=True)
+            
+            # إنشاء الصورة
+            img = qr.make_image(
+                fill_color=self.settings.get('foreground_color', '#000000'),
+                back_color=self.settings.get('background_color', '#FFFFFF')
+            )
+            
+            # Save الصورة مباشرة
+            img.save(file_path, format='PNG')
+            print(f"✅ Saved QR image to: {file_path}")
+            return True
             
         except Exception as e:
-            print(f"خطأ في حفظ صورة QR: {e}")
+            print(f"❌ Error في Save صورة QR: {e}")
             return False
     
     def add_logo_to_qr(self, qr_img, logo_path):
-        """إضافة شعار إلى رمز QR"""
+        """Add شعار إلى رمز QR"""
         try:
             from PIL import Image
             
@@ -263,7 +303,7 @@ class QRCodeManager:
             return qr_img
             
         except Exception as e:
-            print(f"خطأ في إضافة الشعار: {e}")
+            print(f"Error في Add الشعار: {e}")
             return qr_img
     
     def verify_qr_code(self, scanned_qr: str) -> Optional[Dict[str, Any]]:
@@ -308,7 +348,7 @@ class QRCodeManager:
                             return None
                             
                     except ValueError:
-                        # إذا فشل في تحليل التاريخ، تجاهل التحقق من الوقت
+                        # إذا Failed في تحليل التاريخ، تجاهل التحقق من الوقت
                         pass
                 
                 return {
@@ -356,16 +396,16 @@ class QRCodeManager:
             return None
             
         except Exception as e:
-            print(f"خطأ في التحقق من رمز QR: {e}")
+            print(f"Error في التحقق من رمز QR: {e}")
             return None
     
     def save_qr_image(self, qr_code: str, file_path: str, size: int = None) -> bool:
         """
-        حفظ صورة QR Code إلى ملف
+        Save صورة QR Code إلى ملف
         :param qr_code: رمز QR
         :param file_path: مسار الملف
         :param size: حجم الصورة
-        :return: True إذا تم الحفظ بنجاح
+        :return: True إذا Saved successfully
         """
         try:
             # استخدام الحجم من الإعدادات إذا لم يتم تحديده
@@ -385,7 +425,7 @@ class QRCodeManager:
                 safe_qr_code = base64.b64encode(qr_code.encode('utf-8')).decode('ascii')
                 qr.add_data(safe_qr_code)
             except:
-                # إذا فشل، استخدم النص الأصلي
+                # إذا Failed، استخدم النص الأصلي
                 qr.add_data(qr_code)
             qr.make(fit=True)
             
@@ -395,11 +435,11 @@ class QRCodeManager:
                 back_color=self.settings.get('background_color', '#FFFFFF')
             )
             
-            # إضافة شعار إذا كان مفعلاً
+            # Add شعار إذا كان Enabledاً
             if self.settings.get('add_logo') and self.settings.get('logo_path'):
                 img = self.add_logo_to_qr(img, self.settings['logo_path'])
             
-            # حفظ الصورة
+            # Save الصورة
             img.save(file_path, format='PNG', quality=self.settings.get('image_quality', 95))
             return True
             

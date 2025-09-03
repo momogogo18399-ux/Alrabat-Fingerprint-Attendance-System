@@ -4,15 +4,15 @@ from PyQt6.QtWidgets import (
     QDateEdit, QLineEdit, QDialog, QLabel # <-- تمت إضافته هنا
 )
 from PyQt6.QtCore import QDate, QCoreApplication
-from app.database.database_manager import DatabaseManager
+from app.database.simple_hybrid_manager import SimpleHybridManager
 
 class HolidaysWidget(QWidget):
     """
-    واجهة لإدارة الإجازات الرسمية والأعياد.
+    Interface for managing official holidays والأعياد.
     """
-    def __init__(self):
+    def __init__(self, db_manager=None):
         super().__init__()
-        self.db_manager = DatabaseManager()
+        self.db_manager = db_manager or SimpleHybridManager()
         self.setup_ui()
         self.connect_signals()
         self.load_holidays_data()
@@ -20,7 +20,7 @@ class HolidaysWidget(QWidget):
     def setup_ui(self):
         layout = QVBoxLayout(self)
         
-        # قسم الإضافة
+        # قسم الAdd
         add_layout = QHBoxLayout()
         self.date_edit = QDateEdit(calendarPopup=True, date=QDate.currentDate())
         self.date_edit.setDisplayFormat("yyyy-MM-dd")
@@ -35,7 +35,7 @@ class HolidaysWidget(QWidget):
         add_layout.addWidget(self.add_button)
         layout.addLayout(add_layout)
         
-        # الجدول والحذف
+        # الجدول والDelete
         self.table = QTableWidget()
         self.table.setColumnCount(3)
         self.table.setHorizontalHeaderLabels(["ID", self.tr("Date"), self.tr("Description")])

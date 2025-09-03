@@ -6,7 +6,7 @@ from PyQt6.QtCore import QCoreApplication
 
 class PasswordDialog(QDialog):
     """
-    نافذة حوار آمنة لتغيير كلمة مرور المستخدم.
+    Secure dialog for changing password المستخدم.
     """
     def __init__(self, username, parent=None):
         super().__init__(parent)
@@ -37,7 +37,7 @@ class PasswordDialog(QDialog):
 
     def get_password(self):
         """
-        يتحقق من أن كلمة المرور الجديدة مطابقة للتأكيد ويعيدها.
+        يتحقق من أن كلمة المرور الجديدة مطابقة للConfirm ويعيدها.
         """
         new_pass = self.new_password_input.text()
         confirm_pass = self.confirm_password_input.text()
@@ -50,7 +50,7 @@ class PasswordDialog(QDialog):
             QMessageBox.warning(self, self.tr("Input Error"), self.tr("Passwords do not match. Please try again."))
             return None
 
-        # يمكن إضافة شروط هنا لتعقيد كلمة المرور (مثل الطول، الحروف، الأرقام)
+        # يمكن Add شروط هنا لتعقيد كلمة المرور (مثل الطول، الحروف، الأرقام)
         if len(new_pass) < 6:
             QMessageBox.warning(self, self.tr("Input Error"), self.tr("Password must be at least 6 characters long."))
             return None

@@ -5,18 +5,18 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QCoreApplication
 
 # استيراد الوحدات اللازمة
-from app.database.database_manager import DatabaseManager
+from app.database.simple_hybrid_manager import SimpleHybridManager
 from app.utils.encryption import hash_password
 from app.gui.user_dialog import UserDialog
 from app.gui.password_dialog import PasswordDialog
 
 class UsersWidget(QWidget):
     """
-    واجهة متكاملة لإدارة مستخدمي البرنامج (المديرين والمشرفين).
+    Integrated interface for managing program users (المديرين والمشرفين).
     """
-    def __init__(self):
+    def __init__(self, db_manager=None):
         super().__init__()
-        self.db_manager = DatabaseManager()
+        self.db_manager = db_manager or SimpleHybridManager()
         self.setup_ui()
         self.connect_signals()
         self.load_users_data()
@@ -68,20 +68,26 @@ class UsersWidget(QWidget):
             self.table.setItem(row, 2, QTableWidgetItem(user['role']))
 
     def add_user(self):
-        """تفتح نافذة لإضافة مستخدم جديد."""
+        """تفتح نافذة لAdd مستخدم جديد."""
         dialog = UserDialog(parent=self)
         if dialog.exec():
             data = dialog.get_data()
             if data:
                 hashed_pass = hash_password(data['password'])
-                if self.db_manager.add_user(data['username'], hashed_pass, data['role']):
+                user_data = {
+                    'username': data['username'],
+                    'password': hashed_pass,
+                    'role': data['role']
+                }
+                result = self.db_manager.add_user(user_data)
+                if result is not None:
                     QMessageBox.information(self, self.tr("Success"), self.tr("User added successfully."))
                     self.load_users_data()
                 else:
                     QMessageBox.critical(self, self.tr("Error"), self.tr("Username might already exist."))
 
     def edit_user(self):
-        """تفتح نافذة لتعديل دور المستخدم المحدد."""
+        """تفتح نافذة لEdit دور المستخدم المحدد."""
         selected_row = self.table.currentRow()
         if selected_row < 0:
             QMessageBox.warning(self, self.tr("No Selection"), self.tr("Please select a user to edit.")); return
@@ -95,9 +101,14 @@ class UsersWidget(QWidget):
         dialog = UserDialog(user_data=user_data, parent=self)
         if dialog.exec():
             data = dialog.get_data()
-            if data and self.db_manager.update_user_role(data['id'], data['role']):
-                QMessageBox.information(self, self.tr("Success"), self.tr("User role updated successfully."))
-                self.load_users_data()
+            if data:
+                # Update دور المستخدم باستخدام update_user
+                update_data = {'role': data['role']}
+                if self.db_manager.update_user(data['id'], update_data):
+                    QMessageBox.information(self, self.tr("Success"), self.tr("User role updated successfully."))
+                    self.load_users_data()
+                else:
+                    QMessageBox.critical(self, self.tr("Error"), self.tr("Failed to update user role."))
 
     def change_password(self):
         """تفتح نافذة لتغيير كلمة مرور المستخدم المحدد."""
@@ -113,11 +124,15 @@ class UsersWidget(QWidget):
             password = dialog.get_password()
             if password:
                 hashed_pass = hash_password(password)
-                if self.db_manager.update_user_password(user_id, hashed_pass):
+                # Update كلمة المرور باستخدام update_user
+                update_data = {'password': hashed_pass}
+                if self.db_manager.update_user(user_id, update_data):
                     QMessageBox.information(self, self.tr("Success"), self.tr("Password updated successfully."))
+                else:
+                    QMessageBox.critical(self, self.tr("Error"), self.tr("Failed to update password."))
 
     def delete_user(self):
-        """تحذف المستخدم المحدد بعد التأكيد."""
+        """تDelete المستخدم المحدد بعد الConfirm."""
         selected_row = self.table.currentRow()
         if selected_row < 0:
             QMessageBox.warning(self, self.tr("No Selection"), self.tr("Please select a user to delete.")); return

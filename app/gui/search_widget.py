@@ -3,15 +3,15 @@ from PyQt6.QtWidgets import (
     QLabel, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView
 )
 from PyQt6.QtCore import QCoreApplication
-from app.database.database_manager import DatabaseManager
+from app.database.simple_hybrid_manager import SimpleHybridManager
 
 class SearchWidget(QWidget):
     """
-    واجهة للبحث عن الموظفين بالاسم أو رقم الهاتف أو الكود الوظيفي مع عرض النتائج بشكل مباشر.
+    Interface for searching employees بالاسم أو رقم الهاتف أو الكود الوظيفي مع عرض النتائج بشكل مباشر.
     """
-    def __init__(self):
+    def __init__(self, db_manager=None):
         super().__init__()
-        self.db_manager = DatabaseManager()
+        self.db_manager = db_manager or SimpleHybridManager()
         self.setup_ui()
         self.connect_signals()
 
@@ -19,7 +19,7 @@ class SearchWidget(QWidget):
         """تنشئ وتنظم عناصر الواجهة."""
         layout = QVBoxLayout(self)
         
-        # --- تصميم حقل البحث ---
+        # --- تصميم حقل الSearch ---
         search_layout = QHBoxLayout()
         search_layout.addWidget(QLabel(f"<b>{self.tr('Search Employee')}:</b>"))
         self.search_input = QLineEdit()
@@ -47,18 +47,18 @@ class SearchWidget(QWidget):
 
     def connect_signals(self):
         """تربط إشارات عناصر الواجهة بالدوال المناسبة."""
-        # البحث المباشر يتم عند تغيير النص
+        # الSearch المباشر يتم عند تغيير النص
         self.search_input.textChanged.connect(self.perform_search)
         self.search_button.clicked.connect(self.perform_search)
 
     def perform_search(self):
         """
-        تجلب بيانات الموظفين من قاعدة البيانات بناءً على مصطلح البحث
+        تجلب بيانات الموظفين من قاعدة البيانات بناءً على مصطلح الSearch
         وتقوم بملء جدول النتائج.
         """
         search_term = self.search_input.text().strip()
         
-        # مسح الجدول إذا كان حقل البحث فارغًا
+        # مسح الجدول إذا كان حقل الSearch فارغًا
         if not search_term:
             self.results_table.setRowCount(0)
             return

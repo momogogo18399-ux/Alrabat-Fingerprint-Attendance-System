@@ -19,7 +19,7 @@ class ZKManager:
                 return True
         except Exception as e:
             print(f"Connection failed: {e}")
-            self.conn = None # التأكد من أن الاتصال فارغ عند الفشل
+            self.conn = None # التأكد من أن الاتصال فارغ عند الFailed
             return False
 
     def disconnect(self):
@@ -79,7 +79,7 @@ class ZKManager:
         هذه الدالة تفاعلية وتنتظر وضع الإصبع.
         
         :param user_id: كود الموظف (يجب أن يكون رقمًا أو نصًا قصيرًا).
-        :return: قالب البصمة عند النجاح، أو None عند الفشل.
+        :return: قالب البصمة عند النجاح، أو None عند الFailed.
         """
         if not self.conn:
             print("Not connected to a device.")
@@ -116,4 +116,4 @@ class ZKManager:
 
         except Exception as e:
             print(f"An error occurred during enrollment: {e}")
-            raise e # نمرر الخطأ للأعلى لتعالجه الواجهة
+            raise e # نمرر الError للأعلى لتعالجه الواجهة

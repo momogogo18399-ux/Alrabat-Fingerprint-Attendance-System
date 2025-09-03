@@ -9,7 +9,7 @@ from app.utils.location_parser import extract_lat_lon_from_url
 
 class LocationDialog(QDialog):
     """
-    نافذة حوار لإضافة أو تعديل موقع معتمد، مع إمكانية لصق الرابط.
+    نافذة حوار لAdd أو Edit موقع معتمد، مع إمكانية لصق الرابط.
     """
     def __init__(self, location_data=None, parent=None):
         super().__init__(parent)
@@ -28,6 +28,8 @@ class LocationDialog(QDialog):
         self.fetch_button = QPushButton(self.tr("Fetch Coordinates"))
         
         self.name_input = QLineEdit(self.location_data.get('name', ''))
+        
+
         
         self.latitude_input = QDoubleSpinBox()
         self.latitude_input.setRange(-90.0, 90.0)
@@ -53,9 +55,9 @@ class LocationDialog(QDialog):
         link_layout.addWidget(self.fetch_button)
 
         form = QFormLayout()
-        form.addRow(f"{self.tr('Location Link')}:", link_layout)
-        form.addRow(QLabel("----------------------------------")) # فاصل مرئي
         form.addRow(f"{self.tr('Location Name')} (*):", self.name_input)
+        form.addRow(QLabel("----------------------------------")) # فاصل مرئي
+        form.addRow(f"{self.tr('Location Link')}:", link_layout)
         form.addRow(f"{self.tr('Latitude')}:", self.latitude_input)
         form.addRow(f"{self.tr('Longitude')}:", self.longitude_input)
         form.addRow(f"{self.tr('Allowed Radius')}:", self.radius_input)
@@ -93,8 +95,10 @@ class LocationDialog(QDialog):
             QMessageBox.warning(self, self.tr("Missing Information"), self.tr("Location Name cannot be empty."))
             return None
         data = {
-            'name': name, 'latitude': self.latitude_input.value(),
-            'longitude': self.longitude_input.value(), 'radius_meters': self.radius_input.value(),
+            'name': name, 
+            'latitude': self.latitude_input.value(),
+            'longitude': self.longitude_input.value(), 
+            'radius_meters': self.radius_input.value(),
         }
         if self.is_edit_mode: data['id'] = self.location_data['id']
         return data

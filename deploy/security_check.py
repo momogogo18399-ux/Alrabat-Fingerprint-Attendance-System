@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-سكريبت للتحقق من إعدادات الأمان للنظام
-يجب تشغيله بعد النشر للتأكد من صحة الإعدادات
+Script to check system security settings
+Should be run after deployment to verify correct settings
 """
 
 import os
@@ -21,18 +21,18 @@ except ImportError:
     print("To install: pip install requests")
 
 def print_status(message: str, status: str = "INFO"):
-    """طباعة رسالة مع حالة ملونة"""
+    """Print message with colored status"""
     colors = {
-        "INFO": "\033[94m",    # أزرق
-        "SUCCESS": "\033[92m", # أخضر
-        "WARNING": "\033[93m", # أصفر
-        "ERROR": "\033[91m",   # أحمر
-        "RESET": "\033[0m"     # إعادة تعيين
+        "INFO": "\033[94m",    # Blue
+        "SUCCESS": "\033[92m", # Green
+        "WARNING": "\033[93m", # Yellow
+        "ERROR": "\033[91m",   # Red
+        "RESET": "\033[0m"     # Reset
     }
     print(f"{colors.get(status, colors['INFO'])}[{status}]{colors['RESET']} {message}")
 
 def check_file_permissions():
-    """التحقق من صلاحيات الملفات"""
+    """Check file permissions"""
     print_status("Checking file permissions...", "INFO")
     
     # Cross-platform file paths
@@ -74,7 +74,7 @@ def check_file_permissions():
             print_status(f"File not found: {file_path}", "WARNING")
 
 def check_ssl_certificate(domain: str):
-    """التحقق من شهادة SSL"""
+    """Check SSL certificate"""
     if not REQUESTS_AVAILABLE:
         print_status("Skipping SSL certificate check - requests module not available", "WARNING")
         return
@@ -93,7 +93,7 @@ def check_ssl_certificate(domain: str):
         print_status(f"✗ Cannot reach {domain}: {e}", "ERROR")
 
 def check_firewall():
-    """التحقق من إعدادات جدار الحماية"""
+    """Check firewall settings"""
     print_status("Checking firewall settings...", "INFO")
     
     if os.name == 'nt':  # Windows
@@ -115,7 +115,7 @@ def check_firewall():
             if "Status: active" in result.stdout:
                 print_status("✓ UFW firewall is active", "SUCCESS")
                 
-                # التحقق من المنافذ المفتوحة
+                # Check open ports
                 if "22/tcp" in result.stdout:
                     print_status("✓ SSH port (22) is open", "SUCCESS")
                 else:
@@ -131,7 +131,7 @@ def check_firewall():
             print_status("Warning: UFW not installed", "WARNING")
 
 def check_service_status():
-    """التحقق من حالة الخدمات"""
+    """Check service status"""
     print_status("Checking service status...", "INFO")
     
     if os.name == 'nt':  # Windows
@@ -160,7 +160,7 @@ def check_service_status():
                 print_status(f"Error checking {service}: {e}", "ERROR")
 
 def check_database_connection():
-    """التحقق من اتصال قاعدة البيانات"""
+    """Check database connection"""
     print_status("Checking database connection...", "INFO")
     
     if os.name == 'nt':  # Windows
@@ -191,7 +191,7 @@ def check_database_connection():
             print_status(f"Error checking database: {e}", "ERROR")
     else:  # Unix/Linux
         try:
-            # محاولة الاتصال بقاعدة البيانات
+            # Attempt database connection
             result = subprocess.run([
                 "sudo", "-u", "attendance", "bash", "-c",
                 "cd /opt/attendance && source .venv/bin/activate && python -c 'from app.database.database_manager import DatabaseManager; db = DatabaseManager(); print(\"Connected\")'"
@@ -200,7 +200,7 @@ def check_database_connection():
             if "Connected" in result.stdout:
                 print_status("✓ Database connection successful", "SUCCESS")
                 
-                # محاولة الحصول على معلومات إضافية
+                # محاولة الحصول على Information إضافية
                 try:
                     info_result = subprocess.run([
                         "sudo", "-u", "attendance", "bash", "-c",
@@ -332,7 +332,7 @@ def check_backup_status():
     
     if os.path.exists(backup_dir):
         try:
-            # البحث عن أحدث نسخة احتياطية
+            # الSearch عن أحدث نسخة احتياطية
             backup_files = [f for f in os.listdir(backup_dir) if f.endswith('.sql') or f.endswith('.tar.gz')]
             if backup_files:
                 latest_backup = max(backup_files, key=lambda x: os.path.getctime(os.path.join(backup_dir, x)))
@@ -351,7 +351,7 @@ def check_backup_status():
         print_status("⚠ Backup directory not found", "WARNING")
 
 def check_update_api(domain: str):
-    """التحقق من API التحديثات"""
+    """التحقق من API الUpdateات"""
     if not REQUESTS_AVAILABLE:
         print_status("Skipping update API check - requests module not available", "WARNING")
         return

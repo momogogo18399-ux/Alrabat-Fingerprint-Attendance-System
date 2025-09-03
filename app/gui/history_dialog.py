@@ -7,7 +7,7 @@ from PyQt6.QtCore import QCoreApplication
 
 class HistoryDialog(QDialog):
     """
-    نافذة حوار تعرض سجل الحضور الكامل لموظف معين.
+    Dialog window showing attendance record الكامل لموظف معين.
     """
     def __init__(self, employee_name, history_data, parent=None):
         super().__init__(parent)
@@ -25,7 +25,7 @@ class HistoryDialog(QDialog):
         
         # --- جدول السجل ---
         table = QTableWidget()
-        table.setColumnCount(4) # تمت إضافة عمود للملاحظات
+        table.setColumnCount(4) # تمت Add عمود للملاحظات
         table.setHorizontalHeaderLabels([
             self.tr("Date"), 
             self.tr("Time"), 

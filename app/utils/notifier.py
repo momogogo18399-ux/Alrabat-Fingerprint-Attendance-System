@@ -10,7 +10,7 @@ NOTIFIER_HOST = os.getenv('NOTIFIER_HOST', 'localhost')
 
 class NotificationHandler(BaseHTTPRequestHandler):
     """
-    معالج الطلبات الذي يستجيب لطلبات التحديث.
+    معالج الطلبات الذي يستجيب لطلبات الUpdate.
     """
     # نمرر إشارة PyQt كوسيط
     def __init__(self, request, client_address, server, signal_emitter):
@@ -23,7 +23,7 @@ class NotificationHandler(BaseHTTPRequestHandler):
         """
         if self.path == '/notify':
             print("[Notifier] Received update signal. Emitting...")
-            self.signal_emitter.emit() # إصدار الإشارة لتحديث الواجهة
+            self.signal_emitter.emit() # إصدار الإشارة لUpdate الواجهة
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b'OK')

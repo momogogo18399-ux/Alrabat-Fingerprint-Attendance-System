@@ -182,10 +182,10 @@ def build_exe(venv_python: Path, project_root: Path) -> Path:
 
 
 def build_installer(project_root: Path, version: str) -> Path | None:
-	"""بناء المثبتات باستخدام PyInstaller و Inno Setup"""
+	"""Build installers using PyInstaller and Inno Setup"""
 	print_step("Building installer with PyInstaller and Inno Setup")
 	
-	# التحقق من المتطلبات الأساسية
+	# Check basic requirements
 	required_files = [
 		project_root / "requirements.txt",
 		project_root / "app" / "main.py",
@@ -197,18 +197,18 @@ def build_installer(project_root: Path, version: str) -> Path | None:
 			print(f"❌ Required file not found: {file_path}")
 			return None
 	
-	# البحث عن ISCC.exe
+	# Search for ISCC.exe
 	iscc_exe = find_iscc_exe()
 	if not iscc_exe:
 		print("❌ ISCC.exe not found. Please install Inno Setup 6")
 		print("   Download from: https://jrsoftware.org/isdl.php")
 		return None
 	
-	# إنشاء مجلد الإخراج
+	# Create output directory
 	output_dir = project_root / "deploy" / "deploy" / "output"
 	output_dir.mkdir(parents=True, exist_ok=True)
 	
-	# التحقق من وجود PyInstaller
+	# Check PyInstaller availability
 	pyinstaller_available, pyinstaller_version = safe_import_pyinstaller()
 	if pyinstaller_available:
 		print_step(f"PyInstaller version: {pyinstaller_version}")
@@ -226,7 +226,7 @@ def build_installer(project_root: Path, version: str) -> Path | None:
 			print("❌ Failed to install PyInstaller")
 			return None
 	
-	# تحديث ملف Inno Setup
+	# Update Inno Setup file
 	iss_file = project_root / "deploy" / "installer.iss"
 	if iss_file.exists():
 		iss_content = iss_file.read_text(encoding="utf-8")
@@ -234,7 +234,7 @@ def build_installer(project_root: Path, version: str) -> Path | None:
 		iss_file.write_text(iss_content, encoding="utf-8")
 		print_step("Updated installer.iss with version")
 	
-	# بناء المثبت
+	# Build installer
 	try:
 		print_step("Running Inno Setup compiler...")
 		run_cmd([str(iscc_exe), str(iss_file)], cwd=project_root / "deploy")
@@ -247,7 +247,7 @@ def build_installer(project_root: Path, version: str) -> Path | None:
 		print(f"❌ Unexpected error during build: {e}")
 		return None
 	
-	# التحقق من وجود الملفات المطلوبة
+	# Check for required files
 	installer_path = output_dir / f"AttendanceAdminInstaller.exe"
 	if installer_path.exists():
 		size_mb = installer_path.stat().st_size / (1024 * 1024)
@@ -396,7 +396,7 @@ GITHUB_REPO={github_repo or 'your-repo-name'}
 PUBLIC_BASE_URL=https://your-domain.com
 
 # Update Configuration
-UPDATE_NOTES=- تحسينات عامة وإصلاحات أخطاء.\\n- دعم التحقق التلقائي من التحديثات.\\n- تحسينات في الأداء والاستقرار.
+UPDATE_NOTES=- تحسينات عامة وإصلاحات أخطاء.\\n- دعم التحقق التلقائي من الUpdateات.\\n- تحسينات في الأداء والاستقرار.
 MANDATORY_UPDATE=false
 MIN_SUPPORTED_VERSION=1.0.0
 
@@ -446,7 +446,7 @@ def upload_to_github(project_root: Path, version: str, github_token: str, args: 
 	
 	print_step(f"Uploading to GitHub repository: {repo}")
 	
-	# البحث عن الملفات المطلوبة
+	# الSearch عن الملفات المطلوبة
 	installer_path = project_root / "deploy" / "deploy" / "output" / f"AttendanceAdminInstaller.exe"
 	exe_path = project_root / "deploy" / "deploy" / "output" / f"FingerprintAttendanceSystem.exe"
 	
@@ -460,13 +460,13 @@ def upload_to_github(project_root: Path, version: str, github_token: str, args: 
 		print("❌ No installer files found. Run build first.")
 		return
 	
-	# إنشاء أو تحديث الإصدار
+	# إنشاء أو Update الإصدار
 	tag = f"v{version}"
 	release_name = f"Attendance Admin {version}"
 	release_body = f"""## ما الجديد في الإصدار {version}
 
 - تحسينات عامة وإصلاحات أخطاء
-- دعم التحقق التلقائي من التحديثات
+- دعم التحقق التلقائي من الUpdateات
 - تحسينات في الأداء والاستقرار
 - دعم قاعدة البيانات المشتركة
 - تحسينات في الأمان
@@ -476,8 +476,8 @@ def upload_to_github(project_root: Path, version: str, github_token: str, args: 
 2. شغل الملف كمسؤول
 3. اتبع خطوات التثبيت
 
-### التحديث التلقائي
-سيتم التحقق من التحديثات تلقائيًا عند تشغيل البرنامج.
+### الUpdate التلقائي
+سيتم التحقق من الUpdateات تلقائيًا عند تشغيل البرنامج.
 """
 	
 	upload_release_assets(repo, tag, release_name, release_body, assets, github_token)

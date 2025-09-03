@@ -11,7 +11,7 @@ import os
 
 class QRSettingsDialog(QDialog):
     """
-    نافذة إعدادات احترافية لرموز QR
+    Professional settings window لرموز QR
     """
     settings_changed = pyqtSignal(dict)  # إشارة عند تغيير الإعدادات
     
@@ -130,7 +130,7 @@ class QRSettingsDialog(QDialog):
         self.foreground_color_button.clicked.connect(self.choose_foreground_color)
         layout.addRow("Foreground Color:", self.foreground_color_button)
         
-        # إضافة شعار
+        # Add شعار
         self.add_logo_checkbox = QCheckBox("Add Logo in the Middle")
         self.add_logo_checkbox.setChecked(self.settings.get('add_logo', False))
         layout.addRow(self.add_logo_checkbox)
@@ -346,7 +346,7 @@ class QRSettingsDialog(QDialog):
     
     def load_current_settings(self):
         """تحميل الإعدادات الحالية"""
-        # تحديث ألوان الأزرار
+        # Update ألوان الأزرار
         if 'background_color' in self.settings:
             self.background_color_button.setStyleSheet(f"background-color: {self.settings['background_color']}; color: white;")
         
@@ -438,12 +438,12 @@ class QRSettingsDialog(QDialog):
                         if key in default_settings:
                             default_settings[key] = value
         except Exception as e:
-            print(f"خطأ في تحميل إعدادات QR: {e}")
+            print(f"Error في تحميل إعدادات QR: {e}")
         
         return default_settings
     
     def save_settings(self):
-        """حفظ الإعدادات"""
+        """Save الإعدادات"""
         try:
             current_settings = self.get_current_settings()
             
@@ -489,7 +489,7 @@ class QRSettingsDialog(QDialog):
                                       "No employees found in the system.")
                 return
             
-            # تأكيد العملية
+            # Confirm العملية
             reply = QMessageBox.question(
                 self,
                 "Confirm Application",
@@ -516,18 +516,18 @@ class QRSettingsDialog(QDialog):
                         f"Updating QR code for employee: {employee.get('name', 'Unknown')}"
                     )
                     
-                    # التحقق من إلغاء العملية
+                    # التحقق من Cancel العملية
                     if progress_dialog.wasCanceled():
                         break
                     
                     try:
-                        # تحديث إعدادات QR Manager
+                        # Update إعدادات QR Manager
                         qr_manager.update_settings(self.get_current_settings())
                         
                         # إنشاء رمز QR جديد مع الإعدادات الجديدة
                         qr_code = qr_manager.generate_qr_code(employee)
                         if qr_code:
-                            # حفظ الرمز الجديد
+                            # Save الرمز الجديد
                             db_manager.update_employee_qr_code(employee['id'], qr_code)
                             success_count += 1
                         else:
@@ -537,7 +537,7 @@ class QRSettingsDialog(QDialog):
                         error_count += 1
                         print(f"❌ Failed to update QR code for employee {employee.get('name')}: {e}")
                     
-                    # تحديث واجهة المستخدم
+                    # Update واجهة المستخدم
                     QCoreApplication.processEvents()
                 
                 progress_dialog.setValue(len(employees))
@@ -551,7 +551,7 @@ class QRSettingsDialog(QDialog):
                 
                 QMessageBox.information(self, "Success", result_message)
                 
-                # إرسال إشارة تحديث الإعدادات
+                # إرسال إشارة Update الإعدادات
                 self.settings_changed.emit(self.get_current_settings())
                 
         except Exception as e:

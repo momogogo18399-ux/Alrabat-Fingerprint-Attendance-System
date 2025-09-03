@@ -3,16 +3,16 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem, QHeaderView, QMessageBox, QAbstractItemView
 )
 from PyQt6.QtCore import QCoreApplication
-from app.database.database_manager import DatabaseManager
+from app.database.simple_hybrid_manager import SimpleHybridManager
 from app.gui.location_dialog import LocationDialog
 
 class LocationsWidget(QWidget):
     """
-    واجهة لإدارة المواقع المعتمدة (إضافة، تعديل، حذف).
+    Interface for managing approved locations (Add، Edit، Delete).
     """
-    def __init__(self):
+    def __init__(self, db_manager=None):
         super().__init__()
-        self.db_manager = DatabaseManager()
+        self.db_manager = db_manager or SimpleHybridManager()
         self.setup_ui()
         self.connect_signals()
         self.load_locations_data()
@@ -53,9 +53,9 @@ class LocationsWidget(QWidget):
         for row, loc in enumerate(locations):
             self.table.setItem(row, 0, QTableWidgetItem(str(loc['id'])))
             self.table.setItem(row, 1, QTableWidgetItem(loc['name']))
-            self.table.setItem(row, 2, QTableWidgetItem(str(loc['latitude'])))
-            self.table.setItem(row, 3, QTableWidgetItem(str(loc['longitude'])))
-            self.table.setItem(row, 4, QTableWidgetItem(str(loc['radius_meters'])))
+            self.table.setItem(row, 2, QTableWidgetItem(str(loc.get('latitude', 0.0))))
+            self.table.setItem(row, 3, QTableWidgetItem(str(loc.get('longitude', 0.0))))
+            self.table.setItem(row, 4, QTableWidgetItem(str(loc.get('radius_meters', 100))))
 
     def add_location(self):
         dialog = LocationDialog(parent=self)

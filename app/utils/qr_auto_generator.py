@@ -13,7 +13,7 @@ class QRAutoGenerator:
         self.db_manager = DatabaseManager()
     
     def add_qr_column_if_not_exists(self):
-        """إضافة عمود qr_code إذا لم يكن موجوداً"""
+        """Add عمود qr_code إذا لم يكن موجوداً"""
         try:
             conn = sqlite3.connect("attendance.db")
             cursor = conn.cursor()
@@ -23,8 +23,8 @@ class QRAutoGenerator:
             columns = [column[1] for column in cursor.fetchall()]
             
             if 'qr_code' not in columns:
-                print("إضافة عمود qr_code إلى جدول employees...")
-                # إضافة العمود بدون UNIQUE أولاً
+                print("Add عمود qr_code إلى جدول employees...")
+                # Add العمود بدون UNIQUE أولاً
                 cursor.execute("ALTER TABLE employees ADD COLUMN qr_code TEXT")
                 conn.commit()
                 
@@ -34,9 +34,9 @@ class QRAutoGenerator:
                     conn.commit()
                     print("تم إنشاء فهرس فريد لعمود qr_code")
                 except Exception as e:
-                    print(f"تحذير: لم يتم إنشاء فهرس فريد: {e}")
+                    print(f"Warning: لم يتم إنشاء فهرس فريد: {e}")
                 
-                print("تم إضافة عمود qr_code بنجاح")
+                print("تم Add عمود qr_code بنجاح")
             else:
                 print("عمود qr_code موجود بالفعل")
             
@@ -44,13 +44,13 @@ class QRAutoGenerator:
             return True
             
         except Exception as e:
-            print(f"خطأ في إضافة عمود qr_code: {e}")
+            print(f"Error في Add عمود qr_code: {e}")
             return False
     
     def generate_qr_for_all_employees(self):
         """إنشاء رموز QR لجميع الموظفين الذين لا يملكون رموز"""
         try:
-            # إضافة العمود إذا لم يكن موجوداً
+            # Add العمود إذا لم يكن موجوداً
             if not self.add_qr_column_if_not_exists():
                 return False
             
@@ -75,11 +75,11 @@ class QRAutoGenerator:
                         qr_code = self.qr_manager.generate_qr_code(employee)
                         
                         if not qr_code:
-                            print(f"❌ فشل في إنشاء رمز QR للموظف: {employee.get('name')}")
+                            print(f"❌ Failed في إنشاء رمز QR للموظف: {employee.get('name')}")
                             error_count += 1
                             continue
                         
-                        # حفظ الرمز في قاعدة البيانات مباشرة
+                        # Save الرمز في قاعدة البيانات مباشرة
                         conn = sqlite3.connect("attendance.db")
                         cursor = conn.cursor()
                         
@@ -89,7 +89,7 @@ class QRAutoGenerator:
                             success_count += 1
                             print(f"✅ تم إنشاء رمز QR للموظف: {employee.get('name')}")
                         except Exception as db_error:
-                            print(f"❌ خطأ في قاعدة البيانات للموظف {employee.get('name')}: {db_error}")
+                            print(f"❌ Error في قاعدة البيانات للموظف {employee.get('name')}: {db_error}")
                             error_count += 1
                         finally:
                             conn.close()
@@ -98,47 +98,47 @@ class QRAutoGenerator:
                         
                 except Exception as e:
                     error_count += 1
-                    print(f"❌ خطأ في إنشاء رمز QR للموظف {employee.get('name')}: {e}")
+                    print(f"❌ Error في إنشاء رمز QR للموظف {employee.get('name')}: {e}")
             
             print(f"\n=== ملخص العملية ===")
             print(f"✅ تم إنشاء رموز QR بنجاح: {success_count}")
-            print(f"❌ فشل في إنشاء رموز QR: {error_count}")
+            print(f"❌ Failed في إنشاء رموز QR: {error_count}")
             print(f"📊 إجمالي الموظفين: {len(employees)}")
             
             return True
             
         except Exception as e:
-            print(f"خطأ عام في توليد رموز QR: {e}")
+            print(f"Error عام في توليد رموز QR: {e}")
             return False
     
     def regenerate_all_qr_codes(self):
-        """إعادة إنشاء جميع رموز QR (حذف القديمة وإنشاء جديدة)"""
+        """إعادة إنشاء جميع رموز QR (Delete القديمة وإنشاء جديدة)"""
         try:
-            print("⚠️ تحذير: سيتم حذف جميع رموز QR الموجودة وإنشاء رموز جديدة")
+            print("⚠️ Warning: سيتم Delete جميع رموز QR الموجودة وإنشاء رموز جديدة")
             confirm = input("هل تريد المتابعة؟ (y/n): ")
             
             if confirm.lower() != 'y':
-                print("تم إلغاء العملية")
+                print("تم Cancel العملية")
                 return False
             
-            # إضافة العمود إذا لم يكن موجوداً
+            # Add العمود إذا لم يكن موجوداً
             if not self.add_qr_column_if_not_exists():
                 return False
             
-            # حذف جميع رموز QR الموجودة
+            # Delete جميع رموز QR الموجودة
             conn = sqlite3.connect("attendance.db")
             cursor = conn.cursor()
             cursor.execute("UPDATE employees SET qr_code = NULL")
             conn.commit()
             conn.close()
             
-            print("تم حذف جميع رموز QR القديمة")
+            print("تم Delete جميع رموز QR القديمة")
             
             # إنشاء رموز جديدة
             return self.generate_qr_for_all_employees()
             
         except Exception as e:
-            print(f"خطأ في إعادة إنشاء رموز QR: {e}")
+            print(f"Error في إعادة إنشاء رموز QR: {e}")
             return False
     
     def verify_qr_codes(self):
@@ -174,7 +174,7 @@ class QRAutoGenerator:
             return valid_count == len(employees)
             
         except Exception as e:
-            print(f"خطأ في التحقق من رموز QR: {e}")
+            print(f"Error في التحقق من رموز QR: {e}")
             return False
 
 def main():

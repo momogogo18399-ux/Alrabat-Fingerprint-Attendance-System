@@ -6,15 +6,15 @@ from PyQt6.QtCore import QDate, QCoreApplication, Qt
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QFont
 import pandas as pd
-from app.database.database_manager import DatabaseManager
+from app.database.simple_hybrid_manager import SimpleHybridManager
 
 class ReportsWidget(QWidget):
     """
-    مركز تقارير احترافي مع واجهة ديناميكية وأدوات تحكم متقدمة.
+    Professional reporting center مع واجهة ديناميكية وأدوات تحكم متقدمة.
     """
-    def __init__(self):
+    def __init__(self, db_manager=None):
         super().__init__()
-        self.db_manager = DatabaseManager()
+        self.db_manager = db_manager or SimpleHybridManager()
         self.app_settings = self.db_manager.get_all_settings()
         self.setup_ui()
         self.load_employees()

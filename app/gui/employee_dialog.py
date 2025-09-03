@@ -7,12 +7,18 @@ from app.database.database_manager import DatabaseManager
 
 class EmployeeDialog(QDialog):
     """
-    نافذة حوار لإضافة موظف جديد أو تعديل بياناته، مع عرض معلومات الجهاز الصحيحة.
+    Dialog window to add new employee أو Edit بياناته، مع عرض Information الجهاز الصحيحة.
     """
     def __init__(self, employee_data=None, parent=None):
         super().__init__(parent)
         
-        self.db_manager = DatabaseManager()
+        # استخدام النظام الهجين إذا كان متاحاً
+        try:
+            from app.database.simple_hybrid_manager import SimpleHybridManager
+            self.db_manager = SimpleHybridManager()
+        except ImportError:
+            from app.database.database_manager import DatabaseManager
+            self.db_manager = DatabaseManager()
         self.is_edit_mode = employee_data is not None
         self.employee_data = employee_data or {}
         
@@ -27,9 +33,11 @@ class EmployeeDialog(QDialog):
         self.department_input = QLineEdit(self.employee_data.get('department', ''))
         self.phone_number_input = QLineEdit(self.employee_data.get('phone_number', ''))
         
-        # --- بداية التعديل: عرض بصمة Canvas والتوكن معًا ---
+        # --- بداية الEdit: عرض بصمة Canvas والتوكن معًا ---
         canvas_fingerprint = self.employee_data.get('web_fingerprint', '')
         device_token = self.employee_data.get('device_token', '')
+        
+
         
         self.device_info_display = QTextEdit()
         if canvas_fingerprint or device_token:
@@ -48,7 +56,7 @@ class EmployeeDialog(QDialog):
         
         self.device_info_display.setReadOnly(True)
         self.device_info_display.setFixedHeight(100)
-        # --- نهاية التعديل ---
+        # --- نهاية الEdit ---
 
         # التصميم
         layout = QVBoxLayout(self)
@@ -68,13 +76,17 @@ class EmployeeDialog(QDialog):
         self.reset_device_button.setToolTip(self.tr("Clears the registered web device, allowing the employee to check in from a new device/browser."))
         self.reset_device_button.clicked.connect(self.reset_device)
         
-        # إظهار الزر إذا كان أي من المعرفين موجودًا
+        # إظهار الزر إذا كان في وضع التحرير وأي من المعرفين موجودًا
         if not self.is_edit_mode or not (canvas_fingerprint or device_token):
             self.reset_device_button.hide()
+        else:
+            self.reset_device_button.show()
 
         action_buttons_layout.addWidget(self.reset_device_button)
         action_buttons_layout.addStretch()
         layout.addLayout(action_buttons_layout)
+        
+
         
         button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         button_box.accepted.connect(self.accept)

@@ -9,15 +9,49 @@ import sys
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 from app.database.database_manager import DatabaseManager
 from app.database.database_setup import setup_database
+from app.database.simple_hybrid_manager import SimpleHybridManager
+
+# استيراد أنظمة الأمان المتقدمة
+try:
+    from app.utils.face_recognition import face_security
+    FACE_RECOGNITION_AVAILABLE = True
+except ImportError:
+    print("⚠️ Face recognition not available - install face-recognition library")
+    FACE_RECOGNITION_AVAILABLE = False
+    face_security = None
+
+try:
+    from app.utils.biometric_security import biometric_security
+    BIOMETRIC_SECURITY_AVAILABLE = True
+except ImportError:
+    print("⚠️ Biometric security not available")
+    BIOMETRIC_SECURITY_AVAILABLE = False
+    biometric_security = None
+
+try:
+    from app.utils.time_restrictions import time_restrictions
+    TIME_RESTRICTIONS_AVAILABLE = True
+except ImportError:
+    print("⚠️ Time restrictions not available")
+    TIME_RESTRICTIONS_AVAILABLE = False
+    time_restrictions = None
+
+try:
+    from app.utils.audit_logger import audit_logger
+    AUDIT_LOGGER_AVAILABLE = True
+except ImportError:
+    print("⚠️ Audit logger not available")
+    AUDIT_LOGGER_AVAILABLE = False
+    audit_logger = None
 
 from app.version import APP_VERSION
 
 
 # --- ========================================================= ---
-# ---              بداية الإضافة: دوال مساعدة                  ---
+# ---              بداية الAdd: دوال مساعدة                  ---
 # --- ========================================================= ---
 
-# --- بداية الإضافة: نظام الترجمة للرسائل ---
+# --- بداية الAdd: نظام الترجمة للرسائل ---
 MESSAGES = {
     'en': {
         'input_required': 'Input is required.',
@@ -47,10 +81,10 @@ MESSAGES = {
         'login_user_not_found': 'مستخدم غير موجود.',
         'login_invalid_creds': 'بيانات اعتماد غير صحيحة.',
         'login_no_permission': 'ليست لديك صلاحية استخدام وضع المسؤول.',
-        'login_failed': 'فشل تسجيل الدخول: {error}',
+        'login_failed': 'Failed تسجيل الدخول: {error}',
         'employee_not_found': 'المعرّف غير مسجل بالنظام.',
         'no_approved_locations': 'لا توجد مواقع عمل معتمدة. يرجى مراجعة الإدارة.',
-        'location_fail': 'فشل تحديد موقعك. يرجى السماح بذلك والمحاولة مرة أخرى.',
+        'location_fail': 'Failed تحديد موقعك. يرجى السماح بذلك والمحاولة مرة أخرى.',
         'out_of_range': "أنت خارج نطاق العمل المعتمد. أقرب موقع ('{loc_name}') يبعد عنك مسافة {distance:.0f} متر.",
         'browser_linked_to_other': "يا {name}, هذا المتصفح مرتبط بك.",
         'use_registered_device': "يا {name}, يجب عليك استخدام جهازك المسجل.",
@@ -58,7 +92,7 @@ MESSAGES = {
         'checkin_twice': 'لا يمكنك تسجيل الحضور مرتين.',
         'checkout_before_checkin': 'لا يمكنك تسجيل الانصراف قبل الحضور.',
         'record_success': "تم تسجيل '{check_type}' بنجاح من موقع '{location_name}'.",
-        'server_error': 'حدث خطأ في الخادم أثناء حفظ السجل.',
+        'server_error': 'An error occurred في الخادم أثناء Save السجل.',
         'unauthorized': 'وصول غير مصرح به. يرجى تسجيل الدخول.'
     }
 }
@@ -69,7 +103,7 @@ def get_message(key, lang='ar', **kwargs):
     lang = lang if lang in MESSAGES else 'ar'
     message_template = MESSAGES.get(lang, MESSAGES['ar']).get(key, "An unknown error occurred.")
     return message_template.format(**kwargs)
-# --- نهاية الإضافة ---
+# --- نهاية الAdd ---
 
 from math import radians, cos, sin, asin, sqrt
 
@@ -89,18 +123,25 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     return c * r * 1000 # التحويل إلى أمتار
 
 # --- ========================================================= ---
-# ---                       نهاية الإضافة                        ---
+# ---                       نهاية الAdd                        ---
 # --- ========================================================= ---
 
 
 
 # --- الإعدادات ---
 # تأكد من إنشاء قاعدة البيانات والجداول عند تشغيل الخادم لأول مرة
-setup_database()
+# setup_database()  # تم تعطيله مؤقتاً لتجنب مشاكل async
 
 app = Flask(__name__, template_folder='templates')
 app.config['JSON_AS_ASCII'] = False
-db_manager = DatabaseManager()
+# استخدام النظام الهجين إذا كان متاحاً
+try:
+    db_manager = SimpleHybridManager()
+    print("[WEB_APP] Using SimpleHybridManager for database operations")
+except Exception as e:
+    print(f"[WEB_APP] Failed to initialize SimpleHybridManager: {e}")
+    print("[WEB_APP] Falling back to DatabaseManager")
+    db_manager = DatabaseManager()
 DEBUG_MODE = os.getenv('FLASK_DEBUG', '0') == '1'
 
 PUBLIC_BASE_URL = os.getenv('PUBLIC_BASE_URL')  # مثال: https://example.com
@@ -110,7 +151,7 @@ INSTALLER_NAME = os.getenv('INSTALLER_NAME', 'AttendanceAdminInstaller.exe')
 
 def find_employee_by_identifier(identifier):
     """
-    تبحث عن الموظف بذكاء باستخدام الكود الوظيفي أو رقم الهاتف.
+    تSearch عن الموظف بذكاء باستخدام الكود الوظيفي أو رقم الهاتف.
     """
     if len(identifier) > 6 and identifier.isdigit():
         employee = db_manager.get_employee_by_phone(identifier)
@@ -162,8 +203,8 @@ def app_version_api():
     platform_q = request.args.get('platform', 'windows')
     channel = request.args.get('channel', 'stable')
     
-    # ملاحظات التحديث - يمكن تحديثها من متغير البيئة
-    notes = os.getenv('UPDATE_NOTES', "- تحسينات عامة وإصلاحات أخطاء.\n- دعم التحقق التلقائي من التحديثات.\n- تحسينات في الأداء والاستقرار.")
+    # ملاحظات الUpdate - يمكن Updateها من متغير البيئة
+    notes = os.getenv('UPDATE_NOTES', "- تحسينات عامة وإصلاحات أخطاء.\n- دعم التحقق التلقائي من الUpdateات.\n- تحسينات في الأداء والاستقرار.")
     
     # تحديد URL التحميل
     download_url = None
@@ -180,10 +221,10 @@ def app_version_api():
     else:
         download_url = request.host_url.rstrip('/') + '/download/installer'
     
-    # التحقق من إجبارية التحديث
+    # التحقق من إجبارية الUpdate
     mandatory_update = os.getenv('MANDATORY_UPDATE', 'false').lower() == 'true'
     
-    # إضافة معلومات إضافية للتحديث
+    # Add Information إضافية للUpdate
     response_data = {
         'version': APP_VERSION,
         'notes': notes,
@@ -193,10 +234,10 @@ def app_version_api():
         'download_url': download_url,
         'release_date': datetime.datetime.now().isoformat(),
         'min_version': os.getenv('MIN_SUPPORTED_VERSION', '1.0.0'),
-        'checksum': None  # يمكن إضافة checksum للملف لاحقاً
+        'checksum': None  # يمكن Add checksum للملف لاحقاً
     }
     
-    # إضافة headers للأمان
+    # Add headers للأمان
     response = jsonify(response_data)
     response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     response.headers['Pragma'] = 'no-cache'
@@ -239,9 +280,12 @@ def employee_status():
     monthly_attendance = db_manager.execute_query(
         "SELECT COUNT(DISTINCT date) as attendance_days FROM attendance WHERE employee_id = ? AND date BETWEEN ? AND ?",
         (employee['id'], first_day_of_month, today_str),
-        fetchone=True
+        fetch=True
     )
-    monthly_days_count = monthly_attendance['attendance_days'] if monthly_attendance else 0
+    if monthly_attendance and len(monthly_attendance) > 0:
+        monthly_days_count = monthly_attendance[0][0]  # أول قيمة من أول tuple
+    else:
+        monthly_days_count = 0
 
     # --- باقي المنطق ---
     last_action = db_manager.get_last_action_today(employee['id'], today_str)
@@ -277,13 +321,14 @@ def employee_status():
 @app.route('/api/check-in', methods=['POST'])
 def check_in():
     """
-    API لتسجيل الحضور، مع التحقق من الموقع الجغرافي كخطوة أولى.
+    API لتسجيل الحضور مع الأمان المتقدم - التحقق من الوجه، البيومتري، والقيود الزمنية.
     """
     lang = request.headers.get('Accept-Language', 'ar').split(',')[0].split('-')[0]
     data = request.json
-    identifier, fingerprint, token, location, check_type, notes = (
+    identifier, fingerprint, token, location, check_type, notes, face_image, biometric_response = (
         data.get('identifier'), data.get('fingerprint'), data.get('token'),
-        data.get('location'), data.get('type'), data.get('notes')
+        data.get('location'), data.get('type'), data.get('notes'),
+        data.get('face_image'), data.get('biometric_response')
     )
 
     if not all([identifier, fingerprint, token, location, check_type]):
@@ -291,7 +336,30 @@ def check_in():
 
     employee_to_check_in = find_employee_by_identifier(identifier)
     if not employee_to_check_in:
+        # تسجيل محاولة وصول غير مصرح
+        if AUDIT_LOGGER_AVAILABLE:
+            audit_logger.log_security_event(
+                'unauthorized_access_attempt',
+                {'identifier': identifier, 'ip_address': request.remote_addr},
+                ip_address=request.remote_addr
+            )
         return jsonify({'status': 'error', 'message': get_message('employee_not_found', lang)}), 404
+
+    employee_id = employee_to_check_in['id']
+    
+    # 🔒 1. التحقق من القيود الزمنية
+    if TIME_RESTRICTIONS_AVAILABLE:
+        time_check = time_restrictions.is_checkin_allowed(employee_id)
+        if not time_check['allowed']:
+            if AUDIT_LOGGER_AVAILABLE:
+                audit_logger.log_time_restriction_violation(
+                    employee_id, 
+                    time_check.get('restriction_type', 'unknown'),
+                    {'message': time_check['message'], 'ip_address': request.remote_addr}
+                )
+            return jsonify({'status': 'error', 'message': time_check['message']}), 403
+    else:
+        time_check = {'allowed': True, 'message': 'Time restrictions disabled'}
 
     # --- منطق التحقق من الموقع الجغرافي (Geofencing) ---
     approved_locations = db_manager.get_all_locations()
@@ -319,27 +387,84 @@ def check_in():
 
     # --- بداية الكود الذي كان ناقصًا ---
 
-    # --- منطق كشف الغش والأمان المتقدم ---
+    # 🔒 2. التحقق من الجهاز والأمان المتقدم
     owner_by_token = db_manager.get_employee_by_token(token)
     if owner_by_token and owner_by_token['id'] != employee_to_check_in['id']:
+        if AUDIT_LOGGER_AVAILABLE:
+            audit_logger.log_security_event(
+                'device_token_conflict',
+                {'employee_id': employee_id, 'token_owner': owner_by_token['id']},
+                employee_id=employee_id
+            )
         return jsonify({'status': 'error', 'message': get_message('browser_linked_to_other', lang, name=owner_by_token['name'])}), 403
     
     employee_token = employee_to_check_in.get('device_token')
     employee_fingerprint = employee_to_check_in.get('web_fingerprint')
 
+    device_verified = False
     if employee_token:
         if employee_token == token:
-            print(f"[AUTH] Success: Token matched for employee {employee_to_check_in['id']}.")
+            device_verified = True
+            if AUDIT_LOGGER_AVAILABLE:
+                audit_logger.log_device_verification(employee_id, fingerprint, token, True)
+            print(f"[AUTH] Success: Token matched for employee {employee_id}.")
         elif employee_fingerprint == fingerprint:
             print(f"[AUTH] Token mismatch, but Canvas Fingerprint matched. Updating token...")
-            db_manager.execute_query("UPDATE employees SET device_token = ? WHERE id = ?", (token, employee_to_check_in['id']), commit=True)
+            db_manager.execute_query("UPDATE employees SET device_token = ? WHERE id = ?", (token, employee_id), commit=True)
+            device_verified = True
+            if AUDIT_LOGGER_AVAILABLE:
+                audit_logger.log_device_verification(employee_id, fingerprint, token, True)
         else:
-            print(f"[AUTH] FAILED: Token and Fingerprint mismatch for employee {employee_to_check_in['id']}.")
+            if AUDIT_LOGGER_AVAILABLE:
+                audit_logger.log_device_verification(employee_id, fingerprint, token, False)
+            print(f"[AUTH] FAILED: Token and Fingerprint mismatch for employee {employee_id}.")
             return jsonify({'status': 'error', 'message': get_message('use_registered_device', lang, name=employee_to_check_in['name'])}), 403
     else:
-        print(f"[AUTH] First-time registration for employee {employee_to_check_in['id']}.")
-        db_manager.update_employee_device_info(employee_to_check_in['id'], fingerprint, token)
+        print(f"[AUTH] First-time registration for employee {employee_id}.")
+        db_manager.update_employee_device_info(employee_id, fingerprint, token)
+        device_verified = True
+        if AUDIT_LOGGER_AVAILABLE:
+            audit_logger.log_device_verification(employee_id, fingerprint, token, True)
         success_message = get_message('browser_linked_success', lang, name=employee_to_check_in['name'])
+
+    # 🔒 3. التحقق من الوجه (إذا كان متاحاً)
+    face_verified = True  # افتراضياً صحيح إذا لم يكن مطلوباً
+    if face_image and FACE_RECOGNITION_AVAILABLE:
+        face_verified = face_security.verify_employee_face(employee_id, face_image)
+        if AUDIT_LOGGER_AVAILABLE:
+            audit_logger.log_face_recognition(employee_id, face_verified)
+        
+        if not face_verified:
+            if AUDIT_LOGGER_AVAILABLE:
+                audit_logger.log_security_event(
+                    'face_verification_failed',
+                    {'employee_id': employee_id, 'ip_address': request.remote_addr},
+                    employee_id=employee_id
+                )
+            return jsonify({'status': 'error', 'message': 'Face verification failed'}), 403
+
+    # 🔒 4. التحقق البيومتري المتقدم (إذا كان متاحاً)
+    biometric_verified = True  # افتراضياً صحيح إذا لم يكن مطلوباً
+    if biometric_response and BIOMETRIC_SECURITY_AVAILABLE:
+        # إنشاء تحدي التحقق
+        challenge = biometric_security.generate_verification_challenge(employee_id)
+        if challenge:
+            verification_result = biometric_security.verify_biometric_response(
+                challenge['session_id'], 
+                biometric_response, 
+                fingerprint, 
+                token
+            )
+            biometric_verified = verification_result['success']
+            
+            if not biometric_verified:
+                if AUDIT_LOGGER_AVAILABLE:
+                    audit_logger.log_security_event(
+                        'biometric_verification_failed',
+                        {'employee_id': employee_id, 'error': verification_result.get('error')},
+                        employee_id=employee_id
+                    )
+                return jsonify({'status': 'error', 'message': 'Biometric verification failed'}), 403
 
     # --- منطق تسلسل الإجراءات ---
     today_str = datetime.date.today().strftime("%Y-%m-%d")
@@ -349,7 +474,7 @@ def check_in():
     if (check_type == 'Check-Out' and last_action != 'Check-In'):
         return jsonify({'status': 'error', 'message': get_message('checkout_before_checkin', lang)}), 403
 
-    # --- إعداد رسالة النجاح وحفظ البيانات ---
+    # --- إعداد رسالة النجاح وSave البيانات ---
     if 'success_message' not in locals():
         success_message = get_message('record_success', lang, check_type=check_type, location_name=location_name)
     
@@ -374,9 +499,49 @@ def check_in():
         db_manager.update_checkout_with_duration(record_id, duration_hours)
 
     if record_id:
+        # تسجيل نجاح تسجيل الحضور
+        if AUDIT_LOGGER_AVAILABLE:
+            audit_logger.log_attendance_event(
+                employee_id=employee_id,
+                event_type='checkin_success',
+                details={
+                    'check_type': check_type,
+                    'location_id': location_id_to_save,
+                    'location_name': location_name,
+                    'device_verified': device_verified,
+                    'face_verified': face_verified,
+                    'biometric_verified': biometric_verified,
+                    'duration_hours': duration_hours
+                },
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent')
+            )
         
-        return jsonify({'status': 'success', 'message': success_message})
+        return jsonify({
+            'status': 'success', 
+            'message': success_message,
+            'record_id': record_id,
+            'duration_hours': duration_hours,
+            'security_verified': {
+                'device': device_verified,
+                'face': face_verified,
+                'biometric': biometric_verified,
+                'time_restrictions': time_check['allowed']
+            }
+        })
     else:
+        # تسجيل فشل تسجيل الحضور
+        if AUDIT_LOGGER_AVAILABLE:
+            audit_logger.log_attendance_event(
+                employee_id=employee_id,
+                event_type='checkin_failed',
+                details={
+                    'check_type': check_type,
+                    'location_id': location_id_to_save,
+                    'error': 'Database save failed'
+                },
+                ip_address=request.remote_addr
+            )
         return jsonify({'status': 'error', 'message': get_message('server_error', lang)}), 500
     
     # --- نهاية الكود الذي كان ناقصًا ---
@@ -414,7 +579,7 @@ def scan_qr_api():
         if not result or not result.get('is_valid'):
             return jsonify({'success': False, 'error': 'رمز QR غير صالح أو منتهي الصلاحية'}), 400
         
-        # البحث عن الموظف
+        # الSearch عن الموظف
         employee_id = result.get('employee_id')
         employee = db_manager.get_employee_by_id(employee_id)
         
@@ -438,7 +603,7 @@ def scan_qr_api():
             attendance_type = 'check_in'
             message = f"تم تسجيل حضور: {employee['name']} في {current_time_str}"
         
-        # إضافة تسجيل الحضور
+        # Add تسجيل الحضور
         attendance_data = {
             'employee_id': employee_id,
             'check_time': current_time_str,
@@ -460,13 +625,140 @@ def scan_qr_api():
                 }
             }), 200
         else:
-            return jsonify({'success': False, 'error': 'فشل في تسجيل الحضور'}), 500
+            return jsonify({'success': False, 'error': 'Failed في تسجيل الحضور'}), 500
             
     except Exception as e:
-        return jsonify({'success': False, 'error': f'خطأ في معالجة الرمز: {str(e)}'}), 500
+        return jsonify({'success': False, 'error': f'Error في معالجة الرمز: {str(e)}'}), 500
 
+
+# === APIs للأمان المتقدم ===
+
+@app.route('/api/security/register-face', methods=['POST'])
+def register_face():
+    """تسجيل وجه الموظف"""
+    try:
+        if not FACE_RECOGNITION_AVAILABLE:
+            return jsonify({'success': False, 'error': 'Face recognition not available'}), 503
+            
+        data = request.get_json()
+        employee_id = data.get('employee_id')
+        face_image = data.get('face_image')
+        
+        if not employee_id or not face_image:
+            return jsonify({'success': False, 'error': 'بيانات ناقصة'}), 400
+        
+        success = face_security.register_employee_face(employee_id, face_image)
+        
+        if success:
+            if AUDIT_LOGGER_AVAILABLE:
+                audit_logger.log_face_recognition(employee_id, True, details={'action': 'registration'})
+            return jsonify({'success': True, 'message': 'تم تسجيل الوجه بنجاح'})
+        else:
+            return jsonify({'success': False, 'error': 'فشل في تسجيل الوجه'}), 400
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'خطأ في تسجيل الوجه: {str(e)}'}), 500
+
+@app.route('/api/security/verify-face', methods=['POST'])
+def verify_face():
+    """التحقق من وجه الموظف"""
+    try:
+        data = request.get_json()
+        employee_id = data.get('employee_id')
+        face_image = data.get('face_image')
+        
+        if not employee_id or not face_image:
+            return jsonify({'success': False, 'error': 'بيانات ناقصة'}), 400
+        
+        success = face_security.verify_employee_face(employee_id, face_image)
+        
+        audit_logger.log_face_recognition(employee_id, success)
+        
+        return jsonify({
+            'success': success,
+            'message': 'تم التحقق من الوجه بنجاح' if success else 'فشل التحقق من الوجه'
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'خطأ في التحقق من الوجه: {str(e)}'}), 500
+
+@app.route('/api/security/biometric-challenge', methods=['POST'])
+def get_biometric_challenge():
+    """الحصول على تحدي التحقق البيومتري"""
+    try:
+        data = request.get_json()
+        employee_id = data.get('employee_id')
+        
+        if not employee_id:
+            return jsonify({'success': False, 'error': 'معرف الموظف مطلوب'}), 400
+        
+        challenge = biometric_security.generate_verification_challenge(employee_id)
+        
+        if challenge:
+            return jsonify({
+                'success': True,
+                'challenge': challenge
+            })
+        else:
+            return jsonify({'success': False, 'error': 'فشل في إنشاء التحدي'}), 500
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'خطأ في إنشاء التحدي: {str(e)}'}), 500
+
+@app.route('/api/security/audit-report', methods=['GET'])
+def get_audit_report():
+    """الحصول على تقرير التدقيق"""
+    try:
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        event_type = request.args.get('event_type')
+        employee_id = request.args.get('employee_id', type=int)
+        
+        report = audit_logger.get_audit_report(
+            start_date=start_date,
+            end_date=end_date,
+            event_type=event_type,
+            employee_id=employee_id
+        )
+        
+        return jsonify({
+            'success': True,
+            'report': report
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'خطأ في إنشاء التقرير: {str(e)}'}), 500
+
+@app.route('/api/security/employee-status', methods=['GET'])
+def get_employee_security_status():
+    """الحصول على حالة الأمان للموظف"""
+    try:
+        employee_id = request.args.get('employee_id', type=int)
+        
+        if not employee_id:
+            return jsonify({'success': False, 'error': 'معرف الموظف مطلوب'}), 400
+        
+        # حالة التعرف على الوجه
+        face_status = face_security.get_face_verification_status(employee_id)
+        
+        # حالة الأمان البيومتري
+        biometric_status = biometric_security.get_security_status(employee_id)
+        
+        # حالة القيود الزمنية
+        time_restrictions_status = time_restrictions.get_employee_restrictions(employee_id)
+        
+        return jsonify({
+            'success': True,
+            'employee_id': employee_id,
+            'face_recognition': face_status,
+            'biometric_security': biometric_status,
+            'time_restrictions': time_restrictions_status
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'خطأ في الحصول على حالة الأمان: {str(e)}'}), 500
 
 # --- بدء تشغيل الخادم ---
 if __name__ == '__main__':
-    print("--- Starting Web App Server (Local SQLite Mode) ---")
-    app.run(host='0.0.0.0', port=int(os.getenv('PORT', '5000')), debug=DEBUG_MODE)
+    print("--- Starting Web App Server with Advanced Security ---")
+    app.run(host='127.0.0.1', port=int(os.getenv('PORT', '5000')), debug=DEBUG_MODE)

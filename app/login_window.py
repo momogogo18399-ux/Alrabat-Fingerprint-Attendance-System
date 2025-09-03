@@ -15,9 +15,9 @@ class LoginWindow(QMainWindow):
     نافذة تسجيل الدخول الرئيسية للتطبيق.
     تقوم بالتحقق من هوية المستخدمين قبل منحهم الوصول إلى لوحة التحكم.
     """
-    def __init__(self):
+    def __init__(self, db_manager=None):
         super().__init__()
-        self.db_manager = DatabaseManager()
+        self.db_manager = db_manager or DatabaseManager()
         self.main_win = None  # للاحتفاظ بمرجع للنافذة الرئيسية
 
         self.setWindowTitle(self.tr("Login - Attendance Management System"))
@@ -82,7 +82,7 @@ class LoginWindow(QMainWindow):
 
         # التحقق من وجود المستخدم وصحة كلمة المرور
         if user_data and check_password(password, user_data['password']):
-            # حفظ آخر اسم مستخدم ناجح
+            # Save آخر اسم مستخدم ناجح
             try:
                 settings = QSettings("AttendanceApp", "AdminPanel")
                 settings.setValue("last_username", username)
@@ -90,7 +90,7 @@ class LoginWindow(QMainWindow):
                 pass
             # عند النجاح، افتح النافذة الرئيسية وأغلق نافذة تسجيل الدخول
             # نمرر نسخة التطبيق (app instance) للسماح بالتحكم في الثيم واللغة
-            self.main_win = MainWindow(user_data, QApplication.instance())
+            self.main_win = MainWindow(user_data, QApplication.instance(), db_manager=self.db_manager)
             self.main_win.show()
             self.close()
         else:

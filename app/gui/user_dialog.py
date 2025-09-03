@@ -6,7 +6,7 @@ from PyQt6.QtCore import QCoreApplication
 
 class UserDialog(QDialog):
     """
-    نافذة حوار لإضافة مستخدم برنامج جديد أو تعديل دوره.
+    نافذة حوار لAdd مستخدم برنامج جديد أو Edit دوره.
     """
     def __init__(self, user_data=None, parent=None):
         super().__init__(parent)
@@ -36,7 +36,7 @@ class UserDialog(QDialog):
         form = QFormLayout()
         form.addRow(f"{self.tr('Username')} (*):", self.username_input)
         
-        # عرض حقل كلمة المرور فقط في وضع الإضافة
+        # عرض حقل كلمة المرور فقط في وضع الAdd
         if not self.is_edit_mode:
              form.addRow(f"{self.tr('Password')} (*):", self.password_input)
              
@@ -59,7 +59,7 @@ class UserDialog(QDialog):
         
         if self.is_edit_mode:
             data['id'] = self.user_data['id']
-        else: # وضع الإضافة يتطلب كلمة مرور
+        else: # وضع الAdd يتطلب كلمة مرور
             password = self.password_input.text()
             if not password:
                 QMessageBox.warning(self, self.tr("Missing Information"), self.tr("Password is required when adding a new user."))

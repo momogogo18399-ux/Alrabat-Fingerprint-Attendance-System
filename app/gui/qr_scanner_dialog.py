@@ -12,13 +12,13 @@ import numpy as np
 
 class QRScannerDialog(QDialog):
     """
-    نافذة حوار لمسح رموز QR للموظفين
+    Dialog window for scanning QR codes للموظفين
     """
-    def __init__(self, parent=None):
+    def __init__(self, db_manager=None, parent=None):
         super().__init__(parent)
         
         self.qr_manager = QRCodeManager()
-        self.db_manager = DatabaseManager()
+        self.db_manager = db_manager or DatabaseManager()
         self.camera = None
         self.scanning = False
         
@@ -92,7 +92,7 @@ class QRScannerDialog(QDialog):
         
         layout.addLayout(button_layout)
         
-        # مؤقت لتحديث الكاميرا
+        # مؤقت لUpdate الكاميرا
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_camera)
     
@@ -133,7 +133,7 @@ class QRScannerDialog(QDialog):
         self.camera_label.setText(self.tr("Camera stopped"))
     
     def update_camera(self):
-        """تحديث إطار الكاميرا"""
+        """Update إطار الكاميرا"""
         if not self.scanning or not self.camera:
             return
         
@@ -141,7 +141,7 @@ class QRScannerDialog(QDialog):
         if not ret:
             return
         
-        # البحث عن رموز QR في الإطار
+        # الSearch عن رموز QR في الإطار
         qr_codes = self.detect_qr_codes(frame)
         
         # رسم مربعات حول رموز QR المكتشفة
@@ -261,23 +261,38 @@ class QRScannerDialog(QDialog):
                 attendance_type = 'check_in'
                 message = f"✅ {self.tr('Check-in recorded for')}: {employee['name']} at {current_time_str}"
             
-            # إضافة تسجيل الحضور
-            attendance_data = {
-                'employee_id': employee['id'],
-                'check_time': current_time_str,
-                'date': current_date,
-                'type': attendance_type,
-                'notes': 'QR Code scan'
-            }
+            # Add تسجيل الحضور
+            if hasattr(self.db_manager, 'record_attendance') and hasattr(self.db_manager, '_immediate_sync'):
+                # استخدام النظام الهجين
+                attendance_data = {
+                    'employee_id': employee['id'],
+                    'check_time': current_time_str,
+                    'date': current_date,
+                    'type': attendance_type,
+                    'notes': 'QR Code scan'
+                }
+                result = self.db_manager.record_attendance(attendance_data)
+            else:
+                # استخدام النظام التقليدي
+                attendance_data = {
+                    'employee_id': employee['id'],
+                    'check_time': current_time_str,
+                    'date': current_date,
+                    'type': attendance_type,
+                    'notes': 'QR Code scan'
+                }
+                result = self.db_manager.add_attendance(attendance_data)
             
-            self.db_manager.add_attendance(attendance_data)
-            self.add_result(message)
+            if result:
+                self.add_result(message)
+            else:
+                self.add_result(f"❌ {self.tr('Failed to record attendance')}: Unknown error")
             
         except Exception as e:
             self.add_result(f"❌ {self.tr('Failed to record attendance')}: {str(e)}")
     
     def add_result(self, message):
-        """إضافة رسالة إلى منطقة النتائج"""
+        """Add رسالة إلى منطقة النتائج"""
         from datetime import datetime
         timestamp = datetime.now().strftime('%H:%M:%S')
         self.result_text.append(f"[{timestamp}] {message}")
@@ -287,6 +302,6 @@ class QRScannerDialog(QDialog):
         self.result_text.clear()
     
     def closeEvent(self, event):
-        """معالجة إغلاق النافذة"""
+        """معالجة Close النافذة"""
         self.stop_camera()
         event.accept()
